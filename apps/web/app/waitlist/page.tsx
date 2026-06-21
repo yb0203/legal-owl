@@ -21,7 +21,7 @@ export default async function WaitlistPage({
     return (
       <AuthShell>
         <Status title="You're in." body="Your access has been granted.">
-          <Link href="/matters" className={buttonVariants({ className: "w-full" })}>
+          <Link href="/today" className={buttonVariants({ className: "w-full" })}>
             Open Legal Owl
           </Link>
         </Status>

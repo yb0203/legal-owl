@@ -13,7 +13,7 @@ export async function login(formData: FormData) {
   });
   if (error) redirectWithError("/login", error.message);
   revalidatePath("/", "layout");
-  redirect("/matters");
+  redirect("/today");
 }
 
 export async function signup(formData: FormData) {

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/app/login/actions";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { FORUM_LABELS, type Matter } from "@/lib/types";
 
 export default async function MattersPage() {
@@ -26,16 +25,9 @@ export default async function MattersPage() {
           <h1 className="font-serif text-xl font-semibold">Matters</h1>
           <p className="text-sm text-muted-foreground">{user?.email}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/matters/new" className={buttonVariants({ size: "sm" })}>
-            + New matter
-          </Link>
-          <form action={logout}>
-            <Button variant="outline" size="sm">
-              Sign out
-            </Button>
-          </form>
-        </div>
+        <Link href="/matters/new" className={buttonVariants({ size: "sm" })}>
+          + New matter
+        </Link>
       </header>
 
       {matters.length === 0 ? (

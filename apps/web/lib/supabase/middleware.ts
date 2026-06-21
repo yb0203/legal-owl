@@ -48,7 +48,7 @@ export async function updateSession(request: NextRequest) {
   // to the app or the waitlist screen based on has_access.
   if (user && path === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/matters";
+    url.pathname = "/today";
     return NextResponse.redirect(url);
   }
 
