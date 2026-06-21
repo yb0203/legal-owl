@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, FilePlus2 } from "lucide-react";
+import { Plus, FilePlus2, UserPlus } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +56,10 @@ export function AppHeader({
             <DropdownMenuItem render={<Link href="/matters/new" />}>
               <FilePlus2 className="size-4" />
               New matter
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/clients/new" />}>
+              <UserPlus className="size-4" />
+              New client
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

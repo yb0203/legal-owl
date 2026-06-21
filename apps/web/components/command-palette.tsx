@@ -11,6 +11,7 @@ import {
   Scale,
   Search,
   Settings,
+  UserPlus,
   Users,
 } from "lucide-react";
 import {
@@ -20,7 +21,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandShortcut,
 } from "@/components/ui/command";
 
 const NAV = [
@@ -79,7 +79,10 @@ export function CommandPalette({
             <CommandItem value="new matter create" onSelect={() => go("/matters/new")}>
               <FilePlus2 />
               New matter
-              <CommandShortcut>N</CommandShortcut>
+            </CommandItem>
+            <CommandItem value="new client create" onSelect={() => go("/clients/new")}>
+              <UserPlus />
+              New client
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Go to">
