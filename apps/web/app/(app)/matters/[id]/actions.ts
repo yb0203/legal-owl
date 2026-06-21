@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nextKey } from "@/lib/db";
 
@@ -186,6 +187,54 @@ export async function setHearingOutcome(formData: FormData) {
     .update({ state, outcome: String(formData.get("outcome") || "").trim() || null })
     .eq("id", hearingId);
   await recomputeNextHearing(supabase, matterId);
+  revalidatePath(`/matters/${matterId}`);
+}
+
+export async function uploadDocument(formData: FormData) {
+  const matterId = String(formData.get("matter_id"));
+  const file = formData.get("file") as File | null;
+  if (!matterId || !file || file.size === 0) return;
+  const { supabase, user } = await authed();
+  if (!user) return;
+
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${user.id}/${matterId}/${Date.now()}-${safe}`;
+  const { error } = await supabase.storage.from("case-documents").upload(path, file, {
+    contentType: file.type || undefined,
+    upsert: false,
+  });
+  if (error) return;
+
+  await supabase.from("documents").insert({
+    lawyer_id: user.id,
+    matter_id: matterId,
+    name: file.name,
+    storage_path: path,
+    mime_type: file.type || null,
+    size_bytes: file.size,
+    source: String(formData.get("source") || "lawyer_upload"),
+  });
+  revalidatePath(`/matters/${matterId}`);
+}
+
+export async function downloadDocument(formData: FormData) {
+  const path = String(formData.get("storage_path"));
+  if (!path) return;
+  const { supabase, user } = await authed();
+  if (!user) return;
+  const { data } = await supabase.storage.from("case-documents").createSignedUrl(path, 120);
+  if (data?.signedUrl) redirect(data.signedUrl);
+}
+
+export async function deleteDocument(formData: FormData) {
+  const docId = String(formData.get("doc_id"));
+  const matterId = String(formData.get("matter_id"));
+  const path = String(formData.get("storage_path"));
+  if (!docId) return;
+  const { supabase, user } = await authed();
+  if (!user) return;
+  if (path) await supabase.storage.from("case-documents").remove([path]);
+  await supabase.from("documents").delete().eq("id", docId);
   revalidatePath(`/matters/${matterId}`);
 }
 

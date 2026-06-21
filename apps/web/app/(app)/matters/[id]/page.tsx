@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   FORUM_LABELS,
@@ -19,7 +19,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatterStatusControl } from "@/components/matter/matter-status";
 import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
 import { TaskList, type TaskRow } from "@/components/matter/task-list";
-import { addRemark, addHearing, setHearingOutcome, addDeadline } from "./actions";
+import {
+  addRemark,
+  addHearing,
+  setHearingOutcome,
+  addDeadline,
+  uploadDocument,
+  downloadDocument,
+  deleteDocument,
+} from "./actions";
 
 const EVENT_LABELS: Record<string, string> = {
   order_uploaded: "Order uploaded",
@@ -78,7 +86,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
     supabase.from("actions").select("id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type)").eq("matter_id", id).order("created_at", { ascending: true }).returns<TaskRow[]>(),
     supabase.from("hearings").select("id, hearing_date, purpose, outcome, state").eq("matter_id", id).order("hearing_date", { ascending: false }),
     supabase.from("deadlines").select("id, type, due_date, basis").eq("matter_id", id).order("due_date", { ascending: true }),
-    supabase.from("documents").select("id, name, source, uploaded_at").eq("matter_id", id).order("uploaded_at", { ascending: false }),
+    supabase.from("documents").select("id, name, source, uploaded_at, storage_path").eq("matter_id", id).order("uploaded_at", { ascending: false }),
     supabase.from("workflow_states").select("id, name, type, position").is("lawyer_id", null).order("position").returns<WorkflowState[]>(),
   ]);
 
@@ -274,16 +282,42 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
         </TabsContent>
 
         {/* Documents */}
-        <TabsContent value="documents" className="mt-4">
+        <TabsContent value="documents" className="mt-4 space-y-4">
+          <form action={uploadDocument} className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+            <input type="hidden" name="matter_id" value={id} />
+            <input
+              name="file"
+              type="file"
+              required
+              className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"
+            />
+            <select name="source" defaultValue="lawyer_upload" aria-label="Document type" className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none">
+              <option value="lawyer_upload">Filing / upload</option>
+              <option value="court_order">Court order</option>
+              <option value="judgement">Judgement</option>
+            </select>
+            <Button type="submit" size="sm">Upload</Button>
+          </form>
           {(documents?.length ?? 0) === 0 ? (
-            <EmptyState title="No documents yet" hint="Upload orders, judgements and filings — coming in an upcoming update." />
+            <EmptyState title="No documents yet" hint="Upload orders, judgements and filings to keep the file together." />
           ) : (
             <ul className="divide-y overflow-hidden rounded-xl border">
               {documents!.map((d) => (
                 <li key={d.id} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
                   <FileText className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                  <form action={downloadDocument} className="min-w-0 flex-1">
+                    <input type="hidden" name="storage_path" value={d.storage_path} />
+                    <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
+                  </form>
                   <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
+                  <form action={deleteDocument} className="shrink-0">
+                    <input type="hidden" name="doc_id" value={d.id} />
+                    <input type="hidden" name="matter_id" value={id} />
+                    <input type="hidden" name="storage_path" value={d.storage_path} />
+                    <button type="submit" aria-label="Delete document" className="text-muted-foreground hover:text-urgent">
+                      <Trash2 className="size-4" />
+                    </button>
+                  </form>
                 </li>
               ))}
             </ul>
