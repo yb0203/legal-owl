@@ -2,9 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Inbox, Scale, ListTodo, Settings, LogOut } from "lucide-react";
+import {
+  Home,
+  CalendarDays,
+  Scale,
+  Inbox,
+  ListTodo,
+  Users,
+  Settings,
+  ChevronsUpDown,
+  LogOut,
+} from "lucide-react";
 import { Wordmark } from "@/components/wordmark";
 import { logout } from "@/app/login/actions";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarHeader,
@@ -18,21 +35,24 @@ import {
 } from "@/components/ui/sidebar";
 
 const NAV = [
-  { href: "/today", label: "Today", icon: CalendarDays },
-  { href: "/triage", label: "Triage", icon: Inbox },
+  { href: "/home", label: "Home", icon: Home },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/matters", label: "Matters", icon: Scale },
-  { href: "/actions", label: "Actions", icon: ListTodo },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AppSidebar({
   email,
-  triageCount = 0,
+  inboxCount = 0,
 }: {
   email?: string | null;
-  triageCount?: number;
+  inboxCount?: number;
 }) {
   const pathname = usePathname();
+  const initials = (email ?? "?").slice(0, 2).toUpperCase();
 
   return (
     <Sidebar>
@@ -47,16 +67,12 @@ export function AppSidebar({
               const active = pathname === href || pathname.startsWith(href + "/");
               return (
                 <SidebarMenuItem key={href}>
-                  <SidebarMenuButton
-                    isActive={active}
-                    tooltip={label}
-                    render={<Link href={href} />}
-                  >
+                  <SidebarMenuButton isActive={active} tooltip={label} render={<Link href={href} />}>
                     <Icon />
                     <span>{label}</span>
                   </SidebarMenuButton>
-                  {href === "/triage" && triageCount > 0 && (
-                    <SidebarMenuBadge>{triageCount}</SidebarMenuBadge>
+                  {href === "/inbox" && inboxCount > 0 && (
+                    <SidebarMenuBadge>{inboxCount}</SidebarMenuBadge>
                   )}
                 </SidebarMenuItem>
               );
@@ -65,19 +81,38 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
-        <div className="flex items-center justify-between gap-2 px-2 text-xs text-muted-foreground">
-          <span className="truncate">{email}</span>
-          <form action={logout}>
-            <button
-              type="submit"
-              aria-label="Sign out"
-              className="rounded p-1 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+      <SidebarFooter className="p-2">
+        <form action={logout} id="signout-form" className="hidden" />
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent"
+              />
+            }
+          >
+            <Avatar className="size-7">
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <span className="min-w-0 flex-1 truncate text-sm">{email}</span>
+            <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-52">
+            <DropdownMenuItem render={<Link href="/settings" />}>
+              <Settings className="size-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                (document.getElementById("signout-form") as HTMLFormElement | null)?.requestSubmit()
+              }
             >
               <LogOut className="size-4" />
-            </button>
-          </form>
-        </div>
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );

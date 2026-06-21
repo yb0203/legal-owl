@@ -46,14 +46,14 @@ export default async function TodayPage() {
 
       {(triageCount ?? 0) > 0 && (
         <Link
-          href="/triage"
+          href="/inbox"
           className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-lemon/40 bg-lemon/10 px-4 py-3 text-sm transition-colors hover:bg-lemon/15"
         >
           <span className="font-medium">
             {triageCount} court update{triageCount === 1 ? "" : "s"} need your review
           </span>
           <span className="flex items-center gap-1 text-muted-foreground">
-            Open triage <ChevronRight className="size-4" />
+            Open inbox <ChevronRight className="size-4" />
           </span>
         </Link>
       )}
@@ -87,8 +87,8 @@ export default async function TodayPage() {
       </section>
 
       <section className="mt-8 grid grid-cols-2 gap-4">
-        <Stat label="Open actions" value={openActions ?? 0} href="/actions" />
-        <Stat label="In triage" value={triageCount ?? 0} href="/triage" />
+        <Stat label="Open tasks" value={openActions ?? 0} href="/tasks" />
+        <Stat label="In inbox" value={triageCount ?? 0} href="/inbox" />
       </section>
     </main>
   );

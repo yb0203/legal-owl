@@ -13,7 +13,7 @@ export async function login(formData: FormData) {
   });
   if (error) redirectWithError("/login", error.message);
   revalidatePath("/", "layout");
-  redirect("/today");
+  redirect("/home");
 }
 
 export async function signup(formData: FormData) {
@@ -27,7 +27,7 @@ export async function signup(formData: FormData) {
   // Email is auto-confirmed (DB trigger), so establish a session right away.
   await supabase.auth.signInWithPassword({ email, password });
   revalidatePath("/", "layout");
-  redirect("/today");
+  redirect("/home");
 }
 
 export async function logout() {

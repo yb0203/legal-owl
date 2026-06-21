@@ -123,7 +123,7 @@ export async function seedSampleData() {
   ]);
 
   revalidatePath("/", "layout");
-  redirect("/today");
+  redirect("/home");
 }
 
 // Removes the demo data (used by the "see it in action" toggle when turned off).

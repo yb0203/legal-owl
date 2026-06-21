@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
-import { seedSampleData, clearSampleData } from "@/app/(app)/today/actions";
+import { seedSampleData, clearSampleData } from "@/app/(app)/home/actions";
 
 // "See it in action" — turning on seeds demo data (and lands on Today);
 // turning off removes it.
