@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getWaitlistAccess } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
-import { Wordmark } from "@/components/wordmark";
+import { AuthShell } from "@/components/auth-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 
 export default async function WaitlistPage({
@@ -19,11 +19,13 @@ export default async function WaitlistPage({
   // Approved + signed in shouldn't be here — send them in.
   if (user && (await getWaitlistAccess(supabase, user.email))) {
     return (
-      <Centered title="You're in." body="Your access has been granted.">
-        <Link href="/matters" className={buttonVariants()}>
-          Open Legal Owl
-        </Link>
-      </Centered>
+      <AuthShell>
+        <Status title="You're in." body="Your access has been granted.">
+          <Link href="/matters" className={buttonVariants({ className: "w-full" })}>
+            Open Legal Owl
+          </Link>
+        </Status>
+      </AuthShell>
     );
   }
 
@@ -40,21 +42,25 @@ export default async function WaitlistPage({
       : "Legal Owl is invite-only for now.";
 
   return (
-    <Centered title={title} body={body}>
-      {user ? (
-        <form action={logout}>
-          <Button variant="outline">Sign out</Button>
-        </form>
-      ) : (
-        <Link href="/" className={buttonVariants({ variant: "outline" })}>
-          ← Back home
-        </Link>
-      )}
-    </Centered>
+    <AuthShell>
+      <Status title={title} body={body}>
+        {user ? (
+          <form action={logout}>
+            <Button variant="outline" className="w-full">
+              Sign out
+            </Button>
+          </form>
+        ) : (
+          <Link href="/" className={buttonVariants({ variant: "outline", className: "w-full" })}>
+            ← Back home
+          </Link>
+        )}
+      </Status>
+    </AuthShell>
   );
 }
 
-function Centered({
+function Status({
   title,
   body,
   children,
@@ -64,13 +70,10 @@ function Centered({
   children: React.ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-5">
-      <div className="w-full max-w-sm text-center">
-        <Wordmark className="mb-8" />
-        <h1 className="font-serif text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-        <div className="mt-6 flex justify-center">{children}</div>
-      </div>
-    </main>
+    <div className="text-center">
+      <h1 className="font-serif text-2xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+      <div className="mt-6">{children}</div>
+    </div>
   );
 }
