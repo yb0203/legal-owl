@@ -22,7 +22,7 @@ export default async function SettingsPage() {
           </div>
         </dl>
         <form action={logout} className="mt-4">
-          <Button variant="outline" size="sm">
+          <Button type="submit" variant="outline" size="sm">
             Sign out
           </Button>
         </form>

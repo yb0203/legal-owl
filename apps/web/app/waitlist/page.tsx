@@ -46,7 +46,7 @@ export default async function WaitlistPage({
       <Status title={title} body={body}>
         {user ? (
           <form action={logout}>
-            <Button variant="outline" className="w-full">
+            <Button type="submit" variant="outline" className="w-full">
               Sign out
             </Button>
           </form>
