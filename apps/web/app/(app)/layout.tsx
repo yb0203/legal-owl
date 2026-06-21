@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getWaitlistAccess } from "@/lib/auth";
 
-// Access gate for the whole app. Requires an authenticated user AND a waitlist
-// row with has_access = true (flipped from the Supabase dashboard). Everyone
-// else is sent to the waitlist screen.
+// Access gate: requires an authenticated user AND has_access = true (flipped from
+// the Supabase dashboard). Everyone else goes to the waitlist screen.
 export default async function AppLayout({
   children,
 }: {
@@ -14,14 +14,7 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const { data } = await supabase
-    .from("waitlist")
-    .select("has_access")
-    .eq("email", (user.email ?? "").toLowerCase())
-    .maybeSingle();
-
-  if (!data?.has_access) redirect("/waitlist");
+  if (!(await getWaitlistAccess(supabase, user.email))) redirect("/waitlist");
 
   return <>{children}</>;
 }

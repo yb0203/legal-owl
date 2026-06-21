@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirectWithError } from "@/lib/redirect";
 
 export async function createMatter(formData: FormData) {
   const supabase = await createClient();
@@ -27,7 +28,7 @@ export async function createMatter(formData: FormData) {
     cnr,
   });
 
-  if (error) redirect("/matters/new?error=" + encodeURIComponent(error.message));
+  if (error) redirectWithError("/matters/new", error.message);
   revalidatePath("/matters");
   redirect("/matters");
 }

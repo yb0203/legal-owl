@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getWaitlistAccess } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
+import { Wordmark } from "@/components/wordmark";
 import { Button, buttonVariants } from "@/components/ui/button";
 
 export default async function WaitlistPage({
@@ -15,28 +17,21 @@ export default async function WaitlistPage({
   } = await supabase.auth.getUser();
 
   // Approved + signed in shouldn't be here — send them in.
-  if (user) {
-    const { data } = await supabase
-      .from("waitlist")
-      .select("has_access")
-      .eq("email", (user.email ?? "").toLowerCase())
-      .maybeSingle();
-    if (data?.has_access) {
-      return (
-        <Centered title="You're in 🎉" body="Your access has been granted.">
-          <Link href="/matters" className={buttonVariants()}>
-            Open Legal Owl
-          </Link>
-        </Centered>
-      );
-    }
+  if (user && (await getWaitlistAccess(supabase, user.email))) {
+    return (
+      <Centered title="You're in." body="Your access has been granted.">
+        <Link href="/matters" className={buttonVariants()}>
+          Open Legal Owl
+        </Link>
+      </Centered>
+    );
   }
 
   const title = user
-    ? "You're on the waitlist"
+    ? "You're on the waitlist."
     : joined
-      ? "You're on the list 🎉"
-      : "Join the waitlist";
+      ? "You're on the list."
+      : "Join the waitlist.";
 
   const body = user
     ? `Your account (${user.email}) is pending access. We'll email you the moment it's granted.`
@@ -71,8 +66,8 @@ function Centered({
   return (
     <main className="flex min-h-screen items-center justify-center px-5">
       <div className="w-full max-w-sm text-center">
-        <div className="mb-2 text-lg font-semibold">⚖️ Legal Owl</div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <Wordmark className="mb-8" />
+        <h1 className="font-serif text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{body}</p>
         <div className="mt-6 flex justify-center">{children}</div>
       </div>

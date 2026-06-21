@@ -1,16 +1,9 @@
 import Link from "next/link";
 import { createMatter } from "./actions";
-
-const FORUMS = [
-  "district",
-  "high_court",
-  "supreme_court",
-  "nclt",
-  "nclat",
-  "arbitration",
-  "tribunal",
-  "other",
-];
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FORUM_TYPES, FORUM_LABELS } from "@/lib/types";
 
 export default async function NewMatterPage({
   searchParams,
@@ -21,53 +14,45 @@ export default async function NewMatterPage({
 
   return (
     <main className="mx-auto max-w-lg p-6">
-      <Link href="/matters" className="text-sm text-gray-500">
+      <Link href="/matters" className="text-sm text-muted-foreground">
         ← Matters
       </Link>
-      <h1 className="mb-6 mt-2 text-xl font-semibold">New matter</h1>
+      <h1 className="mb-6 mt-2 font-serif text-xl font-semibold">New matter</h1>
 
       <form action={createMatter} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Title</label>
-          <input
-            name="title"
-            required
-            placeholder="e.g. MBECL vs SCCL"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="title">Title</Label>
+          <Input id="title" name="title" required placeholder="e.g. MBECL vs SCCL" />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Forum</label>
+        <div className="space-y-1.5">
+          <Label htmlFor="forum_type">Forum</Label>
           <select
+            id="forum_type"
             name="forum_type"
             defaultValue="district"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
-            {FORUMS.map((f) => (
+            {FORUM_TYPES.map((f) => (
               <option key={f} value={f}>
-                {f}
+                {FORUM_LABELS[f]}
               </option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">
-            CNR <span className="text-gray-400">(optional — eCourts link)</span>
-          </label>
-          <input
-            name="cnr"
-            placeholder="e.g. DLHC010001232024"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="cnr">
+            CNR <span className="text-muted-foreground">(optional — eCourts link)</span>
+          </Label>
+          <Input id="cnr" name="cnr" placeholder="e.g. DLHC010001232024" className="font-mono" />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <button className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white">
+        <Button type="submit" className="w-full">
           Create matter
-        </button>
+        </Button>
       </form>
     </main>
   );
