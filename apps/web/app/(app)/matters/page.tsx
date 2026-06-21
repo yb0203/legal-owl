@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "../login/actions";
+import { logout } from "@/app/login/actions";
 import type { Matter } from "@/lib/types";
 
 export default async function MattersPage() {

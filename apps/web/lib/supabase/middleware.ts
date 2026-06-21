@@ -34,9 +34,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  if (!user && !path.startsWith("/login")) {
+  const publicPaths = ["/", "/login", "/waitlist"];
+  const isPublic = publicPaths.includes(path);
+
+  // Unauthenticated users can only see public pages (landing, login, waitlist).
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Authenticated users skip the login screen; the (app) layout then routes them
+  // to the app or the waitlist screen based on has_access.
+  if (user && path === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/matters";
     return NextResponse.redirect(url);
   }
 
