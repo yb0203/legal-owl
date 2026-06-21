@@ -50,93 +50,93 @@
 }
 
 /*
-  Legal Owl — "court ledger" theme. Warm paper canvas, near-black ink, a single
-  court-blue accent, one urgent red. All tokens are CSS variables so the theme
-  swaps in one place.
+  Legal Owl — pastel theme. Soft lavender canvas, periwinkle accent, gentle
+  pastel status hues. All tokens are CSS variables so the theme swaps in one place.
 */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
-  --background: oklch(0.985 0.006 83); /* warm paper */
-  --foreground: oklch(0.23 0.012 265); /* ink */
+  --background: oklch(0.98 0.013 300); /* soft lavender paper */
+  --foreground: oklch(0.34 0.03 295);  /* soft plum ink */
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.23 0.012 265);
+  --card-foreground: oklch(0.34 0.03 295);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.012 265);
+  --popover-foreground: oklch(0.34 0.03 295);
 
-  --primary: oklch(0.45 0.13 250); /* court blue — the single accent */
-  --primary-foreground: oklch(0.99 0.005 250);
+  --primary: oklch(0.62 0.13 285); /* periwinkle — the accent */
+  --primary-foreground: oklch(0.99 0.005 285);
 
-  --secondary: oklch(0.96 0.006 83);
-  --secondary-foreground: oklch(0.28 0.012 265);
-  --muted: oklch(0.955 0.006 83);
-  --muted-foreground: oklch(0.5 0.014 265);
-  --accent: oklch(0.94 0.02 250); /* faint court tint for hover */
-  --accent-foreground: oklch(0.4 0.12 250);
+  --secondary: oklch(0.95 0.02 300);
+  --secondary-foreground: oklch(0.4 0.04 290);
+  --muted: oklch(0.955 0.018 300);
+  --muted-foreground: oklch(0.53 0.03 295);
+  --accent: oklch(0.93 0.04 290); /* soft lilac hover */
+  --accent-foreground: oklch(0.44 0.12 287);
 
-  --destructive: oklch(0.55 0.2 27); /* urgent red */
+  --destructive: oklch(0.63 0.15 15); /* pastel rose */
 
-  --border: oklch(0.9 0.007 83);
-  --input: oklch(0.9 0.007 83);
-  --ring: oklch(0.45 0.13 250);
+  --border: oklch(0.9 0.018 300);
+  --input: oklch(0.9 0.018 300);
+  --ring: oklch(0.62 0.13 285);
 
-  /* semantic helpers (used by the timeline/case UI) */
-  --court: oklch(0.45 0.13 250);
-  --court-foreground: oklch(0.99 0.005 250);
-  --urgent: oklch(0.55 0.2 27);
+  /* semantic helpers */
+  --court: oklch(0.62 0.13 285);
+  --court-foreground: oklch(0.99 0.005 285);
+  --urgent: oklch(0.63 0.15 15);
 
-  --chart-1: oklch(0.45 0.13 250);
-  --chart-2: oklch(0.6 0.1 250);
-  --chart-3: oklch(0.7 0.07 250);
-  --chart-4: oklch(0.55 0.014 265);
-  --chart-5: oklch(0.4 0.014 265);
+  /* pastel status / chart hues */
+  --chart-1: oklch(0.8 0.08 240); /* sky */
+  --chart-2: oklch(0.82 0.08 165); /* mint */
+  --chart-3: oklch(0.85 0.08 60); /* peach */
+  --chart-4: oklch(0.78 0.09 300); /* lilac */
+  --chart-5: oklch(0.81 0.09 10); /* rose */
 
-  --sidebar: oklch(0.975 0.006 83);
-  --sidebar-foreground: oklch(0.23 0.012 265);
-  --sidebar-primary: oklch(0.45 0.13 250);
-  --sidebar-primary-foreground: oklch(0.99 0.005 250);
-  --sidebar-accent: oklch(0.94 0.02 250);
-  --sidebar-accent-foreground: oklch(0.4 0.12 250);
-  --sidebar-border: oklch(0.9 0.007 83);
-  --sidebar-ring: oklch(0.45 0.13 250);
+  --sidebar: oklch(0.97 0.016 300);
+  --sidebar-foreground: oklch(0.34 0.03 295);
+  --sidebar-primary: oklch(0.62 0.13 285);
+  --sidebar-primary-foreground: oklch(0.99 0.005 285);
+  --sidebar-accent: oklch(0.93 0.04 290);
+  --sidebar-accent-foreground: oklch(0.44 0.12 287);
+  --sidebar-border: oklch(0.9 0.018 300);
+  --sidebar-ring: oklch(0.62 0.13 285);
 }
 
 .dark {
-  --background: oklch(0.17 0.012 265);
-  --foreground: oklch(0.96 0.005 83);
-  --card: oklch(0.21 0.012 265);
-  --card-foreground: oklch(0.96 0.005 83);
-  --popover: oklch(0.21 0.012 265);
-  --popover-foreground: oklch(0.96 0.005 83);
-  --primary: oklch(0.7 0.13 250);
-  --primary-foreground: oklch(0.17 0.012 265);
-  --secondary: oklch(0.27 0.012 265);
-  --secondary-foreground: oklch(0.96 0.005 83);
-  --muted: oklch(0.27 0.012 265);
-  --muted-foreground: oklch(0.72 0.012 265);
-  --accent: oklch(0.3 0.04 250);
-  --accent-foreground: oklch(0.9 0.04 250);
-  --destructive: oklch(0.7 0.18 25);
+  --background: oklch(0.2 0.02 295);
+  --foreground: oklch(0.95 0.01 300);
+  --card: oklch(0.24 0.02 295);
+  --card-foreground: oklch(0.95 0.01 300);
+  --popover: oklch(0.24 0.02 295);
+  --popover-foreground: oklch(0.95 0.01 300);
+  --primary: oklch(0.75 0.11 285);
+  --primary-foreground: oklch(0.2 0.02 295);
+  --secondary: oklch(0.3 0.02 295);
+  --secondary-foreground: oklch(0.95 0.01 300);
+  --muted: oklch(0.3 0.02 295);
+  --muted-foreground: oklch(0.72 0.02 297);
+  --accent: oklch(0.34 0.05 290);
+  --accent-foreground: oklch(0.92 0.04 290);
+  --destructive: oklch(0.7 0.15 15);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.13 250);
-  --court: oklch(0.7 0.13 250);
-  --court-foreground: oklch(0.17 0.012 265);
-  --urgent: oklch(0.7 0.18 25);
-  --chart-1: oklch(0.7 0.13 250);
-  --chart-2: oklch(0.6 0.1 250);
-  --chart-3: oklch(0.5 0.08 250);
-  --chart-4: oklch(0.7 0.012 265);
-  --chart-5: oklch(0.55 0.012 265);
-  --sidebar: oklch(0.2 0.012 265);
-  --sidebar-foreground: oklch(0.96 0.005 83);
-  --sidebar-primary: oklch(0.7 0.13 250);
-  --sidebar-primary-foreground: oklch(0.17 0.012 265);
-  --sidebar-accent: oklch(0.3 0.04 250);
-  --sidebar-accent-foreground: oklch(0.9 0.04 250);
+  --ring: oklch(0.75 0.11 285);
+  --court: oklch(0.75 0.11 285);
+  --court-foreground: oklch(0.2 0.02 295);
+  --urgent: oklch(0.7 0.15 15);
+  --chart-1: oklch(0.72 0.09 240);
+  --chart-2: oklch(0.74 0.09 165);
+  --chart-3: oklch(0.78 0.09 60);
+  --chart-4: oklch(0.72 0.1 300);
+  --chart-5: oklch(0.74 0.1 10);
+  --sidebar: oklch(0.24 0.02 295);
+  --sidebar-foreground: oklch(0.95 0.01 300);
+  --sidebar-primary: oklch(0.75 0.11 285);
+  --sidebar-primary-foreground: oklch(0.2 0.02 295);
+  --sidebar-accent: oklch(0.34 0.05 290);
+  --sidebar-accent-foreground: oklch(0.92 0.04 290);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.7 0.13 250);
+  --sidebar-ring: oklch(0.75 0.11 285);
 }
 
 @layer base {
@@ -149,7 +149,6 @@
   html {
     @apply font-sans;
   }
-  /* tabular figures for the data the product lives on: dates, CNRs, counts */
   .tnum {
     font-variant-numeric: tabular-nums;
   }

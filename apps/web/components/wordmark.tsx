@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { OwlMark } from "@/components/owl-mark";
 
-// "LO" monogram + serif wordmark. Restrained, no stock legal iconography.
+// Owl mark + serif wordmark.
 export function Wordmark({
   href = "/",
   className = "",
@@ -14,9 +15,7 @@ export function Wordmark({
       className={`inline-flex items-center gap-2 ${className}`}
       aria-label="Legal Owl home"
     >
-      <span className="grid size-6 place-items-center rounded-[6px] bg-primary font-serif text-[11px] font-semibold text-primary-foreground">
-        LO
-      </span>
+      <OwlMark className="size-7" />
       <span className="font-serif text-lg font-semibold tracking-tight">
         Legal&nbsp;Owl
       </span>
