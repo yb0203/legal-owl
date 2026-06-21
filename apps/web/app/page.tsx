@@ -41,7 +41,7 @@ export default async function LandingPage({
         aria-hidden
         className="pointer-events-none absolute right-0 top-24 -z-10 hidden md:block"
       >
-        <div className="relative size-[34rem] translate-x-1/3">
+        <div className="relative size-[34rem] translate-x-10">
           <div className="absolute inset-10 rounded-full bg-primary/10 blur-3xl" />
           <div className="owl-ring absolute inset-0 rounded-full opacity-60" />
           <div className="absolute inset-0 grid place-items-center">
