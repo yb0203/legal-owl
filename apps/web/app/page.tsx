@@ -57,15 +57,15 @@ export default async function LandingPage({
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
               For solo lawyers · India
             </p>
-            <h1 className="mt-6 font-serif text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.5rem]">
+            <h1 className="mt-6 font-serif text-4xl font-semibold leading-[1.05] tracking-tight text-balance sm:text-6xl lg:text-7xl">
               The AI-native legal office,{" "}
-              <span className="underline decoration-lemon decoration-[6px] underline-offset-[10px]">
+              <span className="underline decoration-lemon decoration-[5px] underline-offset-[8px]">
                 built for India&apos;s courts.
               </span>
             </h1>
-            <p className="mt-8 max-w-xl text-lg text-muted-foreground sm:text-xl">
-              Track every eCourts matter, turn updates into action, and keep clients
-              informed — grounded in your real case data.
+            <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
+              Track your cases, turn every court update into action, and keep clients
+              informed — grounded in real case data, never guesswork.
             </p>
 
             <form action={joinWaitlist} className="mt-10 flex max-w-md flex-col gap-2 sm:flex-row">
