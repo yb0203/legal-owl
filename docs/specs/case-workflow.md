@@ -212,9 +212,9 @@ Action ──0..1 Hearing | Deadline (anchored "due before")
 
 ## Dependencies / Assumptions
 
-- Depends on the court-monitoring spine (`docs/brainstorms/2026-06-17-court-monitoring-data-layer-requirements.md`)
+- Depends on the court-monitoring spine (`docs/specs/court-monitoring.md`)
   for CNR sync and court events, and on the case-management timeline
-  (`docs/brainstorms/2026-06-18-case-management-requirements.md`).
+  (`docs/specs/case-management.md`).
 - Assumes the Supabase Postgres + RLS + append-only spine from `docs/ARCHITECTURE.md` (Matter replaces the
   CNR-keyed `cases` aggregate there).
 - Assumes a Client entity will exist (owned by Client Notifs); until then `client_id` is a nullable link.
@@ -237,7 +237,7 @@ Action ──0..1 Hearing | Deadline (anchored "due before")
 
 - eCourts India API analysis (core concepts, entities, async refresh, no stable event ids) — synthesized
   for this brainstorm; concrete endpoints/fields in
-  `docs/brainstorms/2026-06-17-court-monitoring-data-layer-requirements.md` and
+  `docs/specs/court-monitoring.md` and
   `prototype/ecourts-streamlit/lib/ecourts_client.py`.
 - Linear data-model analysis (Issue/Project/WorkflowState type abstraction, Triage, relations, sub-issues)
   — used as the ticketing reference; overkill entities (Team/Cycle/Initiative/estimate) deliberately

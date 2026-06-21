@@ -3,7 +3,7 @@ date: 2026-06-21
 topic: frontend-design-learnings
 status: design source of truth — §0 is the v1 build spec
 method: 9-lane UI/UX research (Linear, Superhuman, Harvey, Clio, Attio, Vercel, Provakil, …) + synthesis + anti-slop/scope curation
-related: docs/brainstorms/2026-06-21-case-workflow-requirements.md
+related: docs/specs/case-workflow.md
 ---
 
 # Legal Owl — Frontend Design Learnings

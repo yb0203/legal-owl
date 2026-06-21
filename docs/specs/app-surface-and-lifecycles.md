@@ -27,7 +27,7 @@ real-world application, and draws the v1 line so the rest can land as modules ov
 - **Four-level domain hierarchy: Client → Engagement → Matter → Action.** A client has one or more
   engagements (retainers / one-off briefs); an engagement groups matters; matters carry actions. This
   replaces the bare `client_id` link on Matter — a Matter now belongs to an Engagement, and its client
-  is reached through the engagement. *(Revises `docs/brainstorms/2026-06-21-case-workflow-requirements.md`.)*
+  is reached through the engagement. *(Revises `docs/specs/case-workflow.md`.)*
 - **Engagement is thin in v1.** It is a named grouping with a scope note and a status. Fee/retainer
   amounts, billing, and payments belong to the later finance module — the engagement is where they will
   attach.
@@ -69,7 +69,7 @@ TriageItems, court events, and remarks (from the Case Workflow spec).
 ## Information Architecture
 
 Global shell (desktop sidebar / mobile bottom-nav) + command palette, per
-`docs/design/2026-06-21-frontend-design-learnings.md`.
+`docs/design/frontend-design-learnings.md`.
 
 - **Today** — the dashboard/home (hearings, deadlines, triage count, due/blocked actions).
 - **Triage** — court-event inbox (badge).
@@ -207,8 +207,8 @@ Auth/landing/waitlist already exist outside the shell.
 
 ## Dependencies / Assumptions
 
-- Builds on the Case Workflow spec (`docs/brainstorms/2026-06-21-case-workflow-requirements.md`) and the
-  design learnings (`docs/design/2026-06-21-frontend-design-learnings.md`); shares the Vercel + Supabase
+- Builds on the Case Workflow spec (`docs/specs/case-workflow.md`) and the
+  design learnings (`docs/design/frontend-design-learnings.md`); shares the Vercel + Supabase
   + RLS architecture (`docs/ARCHITECTURE.md`).
 - Conflict check relies on party names already stored on matters (the Case Workflow `parties` data).
 - Assumes the single-lawyer tenant model; clients are records, not users, until the Client Notifs portal.

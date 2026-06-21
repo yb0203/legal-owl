@@ -3,7 +3,7 @@ date: 2026-06-20
 topic: vercel-supabase-reference-architecture
 status: research — feeds docs/ARCHITECTURE.md
 method: Vercel + Supabase docs (current, mid-2026) + web research
-supersedes_framing_in: 2026-06-19-vercel-native-feasibility.md (DPDP §16 correction; pgmq over Graphile)
+supersedes_framing_in: vercel-native-feasibility.md (DPDP §16 correction; pgmq over Graphile)
 ---
 
 # Legal Owl Reference Architecture — Vercel (`bom1`) + Supabase (`ap-south-1`)

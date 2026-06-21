@@ -61,8 +61,14 @@ STRATEGY.md                  # product strategy (source of truth for direction)
 README.md                    # this file
 docs/
   ARCHITECTURE.md            # finalized technical architecture (source of truth)
-  brainstorms/               # requirements: court monitoring, case management
+  specs/                     # durable requirements (court-monitoring, case-management, case-workflow, app-surface)
+  design/                    # frontend design learnings
   research/                  # architecture + Vercel/Supabase + AI-native research
+  plans/                     # implementation plans
+apps/
+  web/                       # Next.js app (Vercel) — the product
+supabase/
+  migrations/                # database schema (Supabase, Mumbai)
 prototype/
   ecourts-streamlit/         # Streamlit prototype of the eCourts integration
 ```

@@ -3,7 +3,7 @@ date: 2026-06-19
 topic: vercel-native-feasibility
 status: research — not yet decided
 method: 9-lane Vercel-product research workflow + synthesis + extreme adversarial critique
-related: 2026-06-19-architecture-ideas-from-legal-systems.md
+related: architecture-ideas-from-legal-systems.md
 ---
 
 # Legal Owl on Vercel — 100% Native Feasibility

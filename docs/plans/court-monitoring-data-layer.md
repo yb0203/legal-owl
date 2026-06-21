@@ -1,7 +1,7 @@
 ---
 date: 2026-06-19
 title: Court Monitoring Data Layer
-origin: docs/brainstorms/2026-06-17-court-monitoring-data-layer-requirements.md
+origin: docs/specs/court-monitoring.md
 stack: Python 3.12, FastAPI, SQLAlchemy (async), asyncpg, Supabase (Postgres), APScheduler
 ---
 

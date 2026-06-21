@@ -137,7 +137,7 @@ The case management track replaces this with a structured, automatically-updated
 
 ## Dependencies and Assumptions
 
-- **Court monitoring data layer.** Case management is built on top of the court monitoring requirements (`docs/brainstorms/2026-06-17-court-monitoring-data-layer-requirements.md`). All data flows from that layer. Case management does not make independent eCourtsIndia API calls — it consumes events and fields already fetched by court monitoring.
+- **Court monitoring data layer.** Case management is built on top of the court monitoring requirements (`docs/specs/court-monitoring.md`). All data flows from that layer. Case management does not make independent eCourtsIndia API calls — it consumes events and fields already fetched by court monitoring.
 - **`caseAiAnalysis` field availability.** The field exists in the eCourtsIndia case detail response and is null in the documented example. When non-null it contains structured sub-fields: summary, key points, outcome, relief granted, and legal provisions cited (under `intelligent_insights_analytics`). Treated as a bonus — never a required field.
 - **Party names as plain string arrays.** eCourtsIndia returns `petitioners` and `respondents` as plain string arrays (e.g. `["MR.ARUN JAITLEY"]`). The auto-composed title uses the first element of each array; multiple parties are joined with a comma.
 - **Single lawyer per case in Phase 1.** No multi-user access, shared cases, or role-based visibility within a firm. Deferred.

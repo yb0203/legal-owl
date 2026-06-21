@@ -22,11 +22,11 @@ entire data + durability + identity tier.
 data. Build the **agent-native typed-action layer from day one** (near-free, and it *is* the AI-native
 foundation).
 
-> Supporting research: `docs/research/2026-06-20-ai-native-legal-office-research.md`,
-> `docs/research/2026-06-20-vercel-supabase-reference-architecture.md`,
-> `docs/research/2026-06-19-architecture-ideas-from-legal-systems.md`,
-> `docs/research/2026-06-19-vercel-native-feasibility.md`. Requirements:
-> `docs/brainstorms/2026-06-17-*` (court monitoring), `docs/brainstorms/2026-06-18-*` (case management).
+> Supporting research: `docs/research/ai-native-legal-office.md`,
+> `docs/research/vercel-supabase-reference-architecture.md`,
+> `docs/research/architecture-ideas-from-legal-systems.md`,
+> `docs/research/vercel-native-feasibility.md`. Requirements:
+> `docs/specs/court-monitoring.md` (court monitoring), `docs/specs/case-management.md` (case management).
 
 ---
 
@@ -176,7 +176,7 @@ cause-list fan-out credit optimization; autonomous send.
   pgmq is GA and lower-ops). Idempotency must guard the billable eCourts call.
 - **Supabase Storage over Vercel Blob** (shared RLS model).
 - **Supabase Auth over Clerk** (India residency; identity holds the lawyer↔client graph).
-- **DPDP §16 correction** to `2026-06-19-vercel-native-feasibility.md`: cross-border AI inference is *permitted
+- **DPDP §16 correction** to `vercel-native-feasibility.md`: cross-border AI inference is *permitted
   today* (blacklist model), not a hard blocker; mitigate contractually.
 - **Agent-native = internal typed-action layer now; public MCP later.**
 - **Client update channel:** Phase 1 = email + no-login status link; WhatsApp + vernacular fast-follow.
