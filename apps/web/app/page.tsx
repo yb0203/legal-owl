@@ -39,9 +39,9 @@ export default async function LandingPage({
       {/* Large dimmed owl backdrop — viewport-anchored, bleeds off the right edge */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-24 -z-10 hidden md:block"
+        className="pointer-events-none absolute left-2/3 top-24 -z-10 hidden md:block"
       >
-        <div className="relative size-[34rem] -translate-x-[42%]">
+        <div className="relative size-[34rem] -translate-x-1/2">
           <div className="absolute inset-10 rounded-full bg-primary/10 blur-3xl" />
           <div className="owl-ring absolute inset-0 rounded-full opacity-60" />
           <div className="absolute inset-0 grid place-items-center">
