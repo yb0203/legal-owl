@@ -19,16 +19,15 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient();
   const email = String(formData.get("email"));
-  const { error } = await supabase.auth.signUp({
-    email,
-    password: String(formData.get("password")),
-  });
+  const password = String(formData.get("password"));
+  const { error } = await supabase.auth.signUp({ email, password });
   if (error) redirectWithError("/login", error.message);
-  // Record the signup on the waitlist so an admin can grant access. New accounts
-  // start without access and land on the waitlist screen until approved.
+  // Record the signup on the waitlist so an admin can grant access.
   await supabase.rpc("join_waitlist", { p_email: email, p_full_name: null });
+  // Email is auto-confirmed (DB trigger), so establish a session right away.
+  await supabase.auth.signInWithPassword({ email, password });
   revalidatePath("/", "layout");
-  redirect("/waitlist");
+  redirect("/today");
 }
 
 export async function logout() {
