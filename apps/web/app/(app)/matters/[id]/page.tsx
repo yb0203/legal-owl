@@ -1,54 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Landmark, MessageSquare } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { FORUM_LABELS, type ForumType, type MatterStatus } from "@/lib/types";
+import {
+  FORUM_LABELS,
+  type ForumType,
+  type MatterStatus,
+  type Parties,
+  type WorkflowState,
+} from "@/lib/types";
+import { fmtDate, fmtDateYear } from "@/lib/format";
+import { CNRChip, ForumBadge, HearingPill, SourceChip } from "@/components/badges";
+import { EmptyState } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { addRemark } from "./actions";
-
-interface MatterDetail {
-  id: string;
-  key: string;
-  cnr: string | null;
-  forum_type: ForumType;
-  title: string;
-  parties: { petitioners?: string[]; respondents?: string[] };
-  case_type: string | null;
-  court_status: string | null;
-  matter_status: MatterStatus;
-  next_hearing_date: string | null;
-}
-interface CourtEvent {
-  id: string;
-  event_type: string;
-  new_value: string | null;
-  occurred_at: string | null;
-  detected_at: string;
-}
-interface Remark {
-  id: string;
-  body: string;
-  created_at: string;
-}
-interface Action {
-  id: string;
-  title: string;
-  due_date: string | null;
-  completed_at: string | null;
-  priority: string;
-}
-interface Hearing {
-  id: string;
-  hearing_date: string;
-  purpose: string | null;
-  outcome: string | null;
-  state: string;
-}
-
-type TimelineItem =
-  | { kind: "event"; key: string; at: string; ev: CourtEvent }
-  | { kind: "remark"; key: string; at: string; rm: Remark };
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MatterStatusControl } from "@/components/matter/matter-status";
+import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
+import { TaskList, type TaskRow } from "@/components/matter/task-list";
+import { addRemark, addHearing, setHearingOutcome, addDeadline } from "./actions";
 
 const EVENT_LABELS: Record<string, string> = {
   order_uploaded: "Order uploaded",
@@ -57,10 +28,26 @@ const EVENT_LABELS: Record<string, string> = {
   judge_changed: "Judge changed",
 };
 
-function fmtDate(d?: string | null) {
-  return d
-    ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-    : "—";
+const DEADLINE_LABELS: Record<string, string> = {
+  limitation: "Limitation",
+  statutory: "Statutory",
+  internal: "Internal",
+};
+
+interface MatterDetail {
+  id: string;
+  key: string;
+  cnr: string | null;
+  forum_type: ForumType;
+  title: string;
+  parties: Parties;
+  case_type: string | null;
+  court_status: string | null;
+  matter_status: MatterStatus;
+  next_hearing_date: string | null;
+  archived_at: string | null;
+  client: { id: string; display_name: string } | null;
+  engagement: { id: string; name: string } | null;
 }
 
 export default async function MatterDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -69,196 +56,240 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
   const { data: matterRow } = await supabase
     .from("matters")
-    .select("id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, next_hearing_date")
+    .select(
+      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, next_hearing_date, archived_at, client:clients(id, display_name), engagement:engagements(id, name)",
+    )
     .eq("id", id)
     .maybeSingle();
   if (!matterRow) notFound();
-  const matter = matterRow as MatterDetail;
+  const matter = matterRow as unknown as MatterDetail;
 
-  const [{ data: events }, { data: remarks }, { data: actions }, { data: hearings }] = await Promise.all([
-    supabase
-      .from("court_events")
-      .select("id, event_type, new_value, occurred_at, detected_at")
-      .eq("matter_id", id)
-      .returns<CourtEvent[]>(),
-    supabase.from("remarks").select("id, body, created_at").eq("matter_id", id).returns<Remark[]>(),
-    supabase
-      .from("actions")
-      .select("id, title, due_date, completed_at, priority")
-      .eq("matter_id", id)
-      .order("due_date", { ascending: true, nullsFirst: false })
-      .returns<Action[]>(),
-    supabase
-      .from("hearings")
-      .select("id, hearing_date, purpose, outcome, state")
-      .eq("matter_id", id)
-      .order("hearing_date", { ascending: false })
-      .returns<Hearing[]>(),
+  const [
+    { data: events },
+    { data: remarks },
+    { data: tasks },
+    { data: hearings },
+    { data: deadlines },
+    { data: documents },
+    { data: states },
+  ] = await Promise.all([
+    supabase.from("court_events").select("id, event_type, new_value, occurred_at, detected_at, source_type").eq("matter_id", id),
+    supabase.from("remarks").select("id, body, created_at").eq("matter_id", id),
+    supabase.from("actions").select("id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type)").eq("matter_id", id).order("created_at", { ascending: true }).returns<TaskRow[]>(),
+    supabase.from("hearings").select("id, hearing_date, purpose, outcome, state").eq("matter_id", id).order("hearing_date", { ascending: false }),
+    supabase.from("deadlines").select("id, type, due_date, basis").eq("matter_id", id).order("due_date", { ascending: true }),
+    supabase.from("documents").select("id, name, source, uploaded_at").eq("matter_id", id).order("uploaded_at", { ascending: false }),
+    supabase.from("workflow_states").select("id, name, type, position").is("lawyer_id", null).order("position").returns<WorkflowState[]>(),
   ]);
 
-  const timeline: TimelineItem[] = [
-    ...(events ?? []).map((ev): TimelineItem => ({
+  type TL = { kind: "event" | "remark"; key: string; at: string; label: string; source: "ecourt" | "lawyer_manual" | "system"; body?: string };
+  const timeline: TL[] = [
+    ...(events ?? []).map((e): TL => ({
       kind: "event",
-      key: `e-${ev.id}`,
-      at: ev.occurred_at ?? ev.detected_at,
-      ev,
+      key: `e-${e.id}`,
+      at: e.occurred_at ?? e.detected_at,
+      label: (EVENT_LABELS[e.event_type] ?? e.event_type) + (e.new_value ? `: ${e.new_value}` : ""),
+      source: e.source_type,
     })),
-    ...(remarks ?? []).map((rm): TimelineItem => ({
+    ...(remarks ?? []).map((r): TL => ({
       kind: "remark",
-      key: `r-${rm.id}`,
-      at: rm.created_at,
-      rm,
+      key: `r-${r.id}`,
+      at: r.created_at,
+      label: "Remark",
+      source: "lawyer_manual",
+      body: r.body,
     })),
   ].sort((a, b) => (a.at < b.at ? 1 : -1));
 
   const parties = matter.parties ?? {};
+  const openTasks = (tasks ?? []).filter((t) => !t.completed_at).length;
 
   return (
     <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
-      <Link
-        href="/matters"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
+      <Link href="/matters" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="size-4" /> Matters
       </Link>
 
+      {/* Pinned case header */}
       <header className="mt-3 rounded-xl border bg-card p-5">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">{matter.title}</h1>
-          <span className="shrink-0 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium capitalize text-secondary-foreground">
-            {matter.matter_status}
-          </span>
+          <div className="min-w-0">
+            <h1 className="font-serif text-2xl font-semibold tracking-tight">{matter.title}</h1>
+            {(parties.petitioners?.length || parties.respondents?.length) && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {(parties.petitioners ?? []).join(", ")}{" "}
+                <span className="text-muted-foreground/60">v.</span>{" "}
+                {(parties.respondents ?? []).join(", ")}
+              </p>
+            )}
+          </div>
+          <EditDetailsDialog
+            matter={{
+              id: matter.id,
+              title: matter.title,
+              case_type: matter.case_type,
+              forum_type: matter.forum_type,
+              cnr: matter.cnr,
+              parties,
+            }}
+          />
         </div>
-        {(parties.petitioners?.length || parties.respondents?.length) && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {(parties.petitioners ?? []).join(", ")}{" "}
-            <span className="text-muted-foreground/60">v.</span>{" "}
-            {(parties.respondents ?? []).join(", ")}
-          </p>
-        )}
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <Field label="Forum" value={FORUM_LABELS[matter.forum_type]} />
-          <Field label="Case type" value={matter.case_type ?? "—"} />
-          <Field label="Next hearing" value={fmtDate(matter.next_hearing_date)} strong />
-          {matter.cnr && <Field label="CNR" value={matter.cnr} mono />}
-        </dl>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <ForumBadge forum={matter.forum_type} />
+          {matter.case_type && <span className="text-muted-foreground">{matter.case_type}</span>}
+          <CNRChip cnr={matter.cnr} />
+          {matter.client && (
+            <Link href={`/clients/${matter.client.id}`} className="text-muted-foreground hover:text-foreground">
+              {matter.client.display_name}
+              {matter.engagement && matter.engagement.name !== "General" ? ` · ${matter.engagement.name}` : ""}
+            </Link>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <div>
+            <div className="text-xs text-muted-foreground">Next hearing</div>
+            <div className="mt-0.5">
+              <HearingPill date={matter.next_hearing_date} />
+            </div>
+          </div>
+          <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
+        </div>
       </header>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium text-muted-foreground">Timeline</h2>
-        <form action={addRemark} className="mt-3 flex items-end gap-2">
-          <input type="hidden" name="matter_id" value={id} />
-          <Textarea
-            name="body"
-            rows={1}
-            placeholder="Add a remark…"
-            className="min-h-10 resize-none"
-            required
-          />
-          <Button type="submit" size="sm">
-            Add
-          </Button>
-        </form>
+      <Tabs defaultValue="timeline" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks {openTasks > 0 && <span className="tnum ml-1 text-muted-foreground">{openTasks}</span>}</TabsTrigger>
+          <TabsTrigger value="hearings">Hearings</TabsTrigger>
+          <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+        </TabsList>
 
-        <ol className="mt-4 space-y-2.5">
-          {timeline.length === 0 && <Empty>No activity yet.</Empty>}
-          {timeline.map((it) =>
-            it.kind === "remark" ? (
-              <li key={it.key} className="rounded-lg border bg-card p-3">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <MessageSquare className="size-3.5" /> Your remark
-                  </span>
-                  <span className="tnum">{fmtDate(it.at)}</span>
-                </div>
-                <p className="mt-1.5 text-sm">{it.rm.body}</p>
-              </li>
-            ) : (
-              <li key={it.key} className="flex items-center gap-3 px-1 py-1 text-sm">
-                <Landmark className="size-4 shrink-0 text-primary" />
-                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-                  eCourts
-                </span>
-                <span className="flex-1 text-foreground/90">
-                  {EVENT_LABELS[it.ev.event_type] ?? it.ev.event_type}
-                  {it.ev.new_value ? `: ${it.ev.new_value}` : ""}
-                </span>
-                <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(it.at)}</span>
-              </li>
-            ),
+        {/* Timeline */}
+        <TabsContent value="timeline" className="mt-4 space-y-4">
+          <form action={addRemark} className="flex items-end gap-2">
+            <input type="hidden" name="matter_id" value={id} />
+            <Textarea name="body" rows={1} required placeholder="Add a remark…" className="min-h-10 resize-none" />
+            <Button type="submit" size="sm">Add</Button>
+          </form>
+          <ol className="space-y-2.5">
+            {timeline.length === 0 && <EmptyState title="No activity yet" hint="Court updates and your remarks will appear here." />}
+            {timeline.map((it) =>
+              it.kind === "remark" ? (
+                <li key={it.key} className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <SourceChip source={it.source} />
+                    <span className="tnum">{fmtDate(it.at)}</span>
+                  </div>
+                  <p className="mt-1.5 text-sm">{it.body}</p>
+                </li>
+              ) : (
+                <li key={it.key} className="flex items-center gap-3 px-1 py-1 text-sm">
+                  <SourceChip source={it.source} />
+                  <span className="flex-1 text-foreground/90">{it.label}</span>
+                  <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(it.at)}</span>
+                </li>
+              ),
+            )}
+          </ol>
+        </TabsContent>
+
+        {/* Tasks */}
+        <TabsContent value="tasks" className="mt-4">
+          <TaskList matterId={id} tasks={tasks ?? []} states={states ?? []} />
+        </TabsContent>
+
+        {/* Hearings */}
+        <TabsContent value="hearings" className="mt-4 space-y-4">
+          <form action={addHearing} className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+            <input type="hidden" name="matter_id" value={id} />
+            <Input name="hearing_date" type="date" required aria-label="Hearing date" className="w-40" />
+            <Input name="purpose" placeholder="Purpose (e.g. Arguments)" className="min-w-48 flex-1" />
+            <Button type="submit" size="sm">Add hearing</Button>
+          </form>
+          {(hearings?.length ?? 0) === 0 ? (
+            <EmptyState title="No hearings on record" />
+          ) : (
+            <ul className="space-y-2">
+              {hearings!.map((h) => (
+                <li key={h.id} className="rounded-lg border bg-card px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{h.purpose ?? "Hearing"}</div>
+                      {h.outcome && <div className="text-xs text-muted-foreground">{h.outcome}</div>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="tnum text-sm font-semibold">{fmtDate(h.hearing_date)}</span>
+                      <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] capitalize text-secondary-foreground">{h.state}</span>
+                    </div>
+                  </div>
+                  {h.state === "scheduled" && (
+                    <form action={setHearingOutcome} className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+                      <input type="hidden" name="hearing_id" value={h.id} />
+                      <input type="hidden" name="matter_id" value={id} />
+                      <select name="state" aria-label="Outcome state" defaultValue="held" className="h-7 rounded-md border border-input bg-transparent px-1.5 text-xs outline-none">
+                        <option value="held">Held</option>
+                        <option value="adjourned">Adjourned</option>
+                      </select>
+                      <Input name="outcome" placeholder="Outcome / next step" className="h-7 min-w-40 flex-1 text-xs" />
+                      <Button type="submit" size="sm" variant="outline">Record</Button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
-        </ol>
-      </section>
+        </TabsContent>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium text-muted-foreground">Actions</h2>
-        {(actions?.length ?? 0) === 0 ? (
-          <Empty>No actions yet.</Empty>
-        ) : (
-          <ul className="mt-3 divide-y overflow-hidden rounded-xl border">
-            {actions!.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
-                <span className={a.completed_at ? "text-muted-foreground line-through" : ""}>
-                  {a.title}
-                </span>
-                {a.due_date && (
-                  <span className="tnum shrink-0 text-xs text-muted-foreground">
-                    due {fmtDate(a.due_date)}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        {/* Deadlines */}
+        <TabsContent value="deadlines" className="mt-4 space-y-4">
+          <form action={addDeadline} className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+            <input type="hidden" name="matter_id" value={id} />
+            <Input name="due_date" type="date" required aria-label="Due date" className="w-40" />
+            <select name="type" aria-label="Deadline type" defaultValue="internal" className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none">
+              <option value="internal">Internal</option>
+              <option value="statutory">Statutory</option>
+              <option value="limitation">Limitation</option>
+            </select>
+            <Input name="basis" placeholder="Basis (optional)" className="min-w-40 flex-1" />
+            <Button type="submit" size="sm">Add deadline</Button>
+          </form>
+          {(deadlines?.length ?? 0) === 0 ? (
+            <EmptyState title="No deadlines" hint="Statutory and limitation dates are computed by rule, never guessed." />
+          ) : (
+            <ul className="divide-y overflow-hidden rounded-xl border">
+              {deadlines!.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
+                  <div>
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-secondary-foreground">{DEADLINE_LABELS[d.type] ?? d.type}</span>
+                    {d.basis && <span className="ml-2 text-muted-foreground">{d.basis}</span>}
+                  </div>
+                  <span className="tnum shrink-0 text-sm font-medium">{fmtDateYear(d.due_date)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </TabsContent>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium text-muted-foreground">Hearings</h2>
-        {(hearings?.length ?? 0) === 0 ? (
-          <Empty>No hearings on record.</Empty>
-        ) : (
-          <ul className="mt-3 divide-y overflow-hidden rounded-xl border">
-            {hearings!.map((h) => (
-              <li key={h.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <div className="truncate">{h.purpose ?? "Hearing"}</div>
-                  {h.outcome && <div className="text-xs text-muted-foreground">{h.outcome}</div>}
-                </div>
-                <span className="tnum shrink-0 text-xs font-medium">{fmtDate(h.hearing_date)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        {/* Documents */}
+        <TabsContent value="documents" className="mt-4">
+          {(documents?.length ?? 0) === 0 ? (
+            <EmptyState title="No documents yet" hint="Upload orders, judgements and filings — coming in an upcoming update." />
+          ) : (
+            <ul className="divide-y overflow-hidden rounded-xl border">
+              {documents!.map((d) => (
+                <li key={d.id} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
+                  <FileText className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                  <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </TabsContent>
+      </Tabs>
     </main>
-  );
-}
-
-function Field({
-  label,
-  value,
-  strong,
-  mono,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={`mt-0.5 ${strong ? "font-semibold" : ""} ${mono ? "font-mono tnum text-xs" : ""}`}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-3 rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-      {children}
-    </div>
   );
 }
