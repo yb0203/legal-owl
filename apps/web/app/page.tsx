@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { joinWaitlist } from "./waitlist/actions";
 import { Wordmark } from "@/components/wordmark";
+import { OwlMark } from "@/components/owl-mark";
+import { Reveal } from "@/components/reveal";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const STEPS: [string, string, string][] = [
+  ["01", "Add a matter", "Paste a CNR or search by party name — district court, High Court, NCLT, arbitration."],
+  ["02", "We watch the courts", "Daily eCourts sync. Every order, hearing date, and status change is captured."],
+  ["03", "Triage into action", "New developments land in an inbox. Accept the ones that need work; the rest stay on the record."],
+  ["04", "Keep clients informed", "Turn a court event into a plain-language update. You approve, it sends."],
+];
+
 const TRACKS: [string, string][] = [
-  ["Court monitoring", "Your eCourts matters sync automatically — no more checking the portal."],
-  ["Case workflow", "Hearings, orders, and your to-dos as one clear, tracked ledger per matter."],
-  ["Lawyer assist", "An assistant that drafts and answers — grounded in your real case data, with sources."],
-  ["Client updates", "Turn a court event into a plain-language client update. You approve, it sends."],
+  ["Court monitoring", "Your matters sync from eCourts automatically — no more portal checks."],
+  ["Case workflow", "Hearings, orders, and your to-dos as one clear ledger per matter."],
+  ["Lawyer assist", "An assistant that drafts and answers, grounded in your real case data."],
+  ["Client updates", "Court events become client updates. Your approval, always."],
 ];
 
 export default async function LandingPage({
@@ -19,47 +28,61 @@ export default async function LandingPage({
   const { error } = await searchParams;
 
   return (
-    <div className="min-h-screen">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
+    <div className="relative min-h-screen overflow-x-clip">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Wordmark />
-        <Link
-          href="/login"
-          className={buttonVariants({ variant: "ghost", size: "sm" })}
-        >
+        <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
           Sign in
         </Link>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5">
-        {/* Hero */}
-        <section className="grid items-center gap-12 py-12 sm:py-20 lg:grid-cols-2 lg:gap-10">
-          <div className="animate-in fade-in slide-in-from-bottom-3 duration-700">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+      {/* Large dimmed owl backdrop — viewport-anchored, bleeds off the right edge */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-0 top-24 -z-10 hidden md:block"
+      >
+        <div className="relative size-[34rem] translate-x-1/3">
+          <div className="absolute inset-10 rounded-full bg-primary/10 blur-3xl" />
+          <div className="owl-ring absolute inset-0 rounded-full opacity-60" />
+          <div className="absolute inset-0 grid place-items-center">
+            <OwlMark className="size-[20rem] text-foreground opacity-[0.07]" />
+          </div>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-6xl px-6">
+        {/* Hero — type-led */}
+        <section className="py-20 sm:py-28 lg:py-36">
+          <div className="relative max-w-4xl animate-in fade-in slide-in-from-bottom-3 duration-700">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
               For solo lawyers · India
             </p>
-            <h1 className="mt-4 font-serif text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              The AI-native legal office for solo lawyers.
+            <h1 className="mt-6 font-serif text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.5rem]">
+              The AI-native legal office,{" "}
+              <span className="underline decoration-lemon decoration-[6px] underline-offset-[10px]">
+                built for India&apos;s courts.
+              </span>
             </h1>
-            <p className="mt-5 max-w-md text-base text-muted-foreground sm:text-lg">
-              Legal Owl tracks your court cases, turns updates into action, and keeps
-              clients informed — every answer traceable to your real case data.
+            <p className="mt-8 max-w-xl text-lg text-muted-foreground sm:text-xl">
+              Track every eCourts matter, turn updates into action, and keep clients
+              informed — grounded in your real case data.
             </p>
 
-            <form action={joinWaitlist} className="mt-7 flex max-w-md flex-col gap-2 sm:flex-row">
+            <form action={joinWaitlist} className="mt-10 flex max-w-md flex-col gap-2 sm:flex-row">
               <Input
                 name="email"
                 type="email"
                 required
                 placeholder="you@chambers.in"
                 aria-label="Email"
-                className="h-11 bg-card"
+                className="h-12 bg-card text-base"
               />
-              <Button type="submit" size="lg" className="h-11 shrink-0">
+              <Button type="submit" size="lg" className="h-12 shrink-0 px-6 text-base">
                 Join the waitlist
               </Button>
             </form>
             {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-            <p className="mt-3 text-xs text-muted-foreground">
+            <p className="mt-4 text-sm text-muted-foreground">
               Invite-only for now. Already approved?{" "}
               <Link href="/login" className="text-foreground underline underline-offset-4">
                 Sign in
@@ -67,46 +90,72 @@ export default async function LandingPage({
               .
             </p>
           </div>
-
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 lg:justify-self-end">
-            <CaseRecordCard />
-          </div>
         </section>
 
-        {/* Value — the four tracks, as a ruled register, not a card grid */}
-        <section className="border-t py-12 sm:py-16">
-          <h2 className="font-serif text-2xl font-semibold tracking-tight">
-            One ledger for the whole practice.
+        {/* Showcase — the one product visual */}
+        <Reveal className="border-t py-20 sm:py-28">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <div>
+              <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+                A living record of every matter.
+              </h2>
+              <p className="mt-4 max-w-md text-muted-foreground">
+                Court events and your own notes on one timeline. The next hearing always
+                in view. The case number always a tap away.
+              </p>
+            </div>
+            <div className="lg:justify-self-end">
+              <CaseRecordCard />
+            </div>
+          </div>
+        </Reveal>
+
+        {/* How it works — numbered roadmap */}
+        <Reveal className="border-t py-20 sm:py-28">
+          <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+            How it works.
           </h2>
-          <div className="mt-8 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
+          <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2">
+            {STEPS.map(([n, title, body], i) => (
+              <Reveal key={n} delay={i * 80} className="flex gap-5">
+                <span className="font-serif text-3xl font-semibold text-primary tnum">{n}</span>
+                <div>
+                  <h3 className="text-lg font-medium">{title}</h3>
+                  <p className="mt-1.5 text-muted-foreground">{body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </Reveal>
+
+        {/* Tracks */}
+        <Reveal className="border-t py-20 sm:py-28">
+          <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+            Built for the whole practice.
+          </h2>
+          <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2">
             {TRACKS.map(([title, body]) => (
-              <div
-                key={title}
-                className="bg-card p-5 transition-colors hover:bg-accent/40"
-              >
-                <h3 className="text-sm font-medium">{title}</h3>
+              <div key={title} className="bg-card p-6 transition-colors hover:bg-accent/50">
+                <h3 className="font-medium">{title}</h3>
                 <p className="mt-1.5 text-sm text-muted-foreground">{body}</p>
               </div>
             ))}
           </div>
-        </section>
+        </Reveal>
 
-        {/* Closing CTA */}
-        <section className="border-t py-14 text-center sm:py-20">
-          <h2 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">
+        {/* Final CTA */}
+        <Reveal className="border-t py-24 text-center sm:py-32">
+          <h2 className="mx-auto max-w-2xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl">
             Be among the first lawyers on Legal Owl.
           </h2>
-          <Link
-            href="#top"
-            className={buttonVariants({ size: "lg", className: "mt-6" })}
-          >
+          <Link href="#top" className={buttonVariants({ size: "lg", className: "mt-8 h-12 px-7 text-base" })}>
             Join the waitlist
           </Link>
-        </section>
+        </Reveal>
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-5 py-6 text-xs text-muted-foreground sm:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-sm text-muted-foreground sm:flex-row">
           <Wordmark className="opacity-80" />
           <p>Built for India · Your case data stays in India.</p>
         </div>
@@ -115,17 +164,14 @@ export default async function LandingPage({
   );
 }
 
-// The hero "art": a real-looking case record, the product rendered as a poster.
 function CaseRecordCard() {
   return (
-    <div className="relative w-full max-w-sm">
-      <div className="absolute inset-0 translate-x-3 translate-y-3 rounded-xl border bg-card/60" aria-hidden />
-      <article className="relative rounded-xl border bg-card p-5 shadow-sm">
+    <div className="relative w-full max-w-sm transition-transform duration-300 hover:-translate-y-1">
+      <div className="absolute inset-0 translate-x-3 translate-y-3 rounded-2xl border bg-card/60" aria-hidden />
+      <article className="relative rounded-2xl border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-serif text-lg font-semibold leading-tight">
-            MBECL vs SCCL
-          </h3>
-          <span className="shrink-0 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+          <h3 className="font-serif text-lg font-semibold leading-tight">MBECL vs SCCL</h3>
+          <span className="shrink-0 rounded-full bg-lemon px-2.5 py-0.5 text-xs font-medium text-lemon-foreground">
             In progress
           </span>
         </div>
@@ -140,14 +186,14 @@ function CaseRecordCard() {
           McNally Bharat Engineering
         </p>
 
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-          <span className="text-sm font-medium text-primary">Next hearing</span>
-          <span className="tnum text-sm font-semibold text-primary">24 Jun · in 3 days</span>
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-3 py-2">
+          <span className="text-sm font-medium">Next hearing</span>
+          <span className="tnum text-sm font-semibold">24 Jun · in 3 days</span>
         </div>
 
         <ol className="mt-4 space-y-3 border-t pt-4">
           <TimelineRow color="bg-primary" label="Order uploaded" date="12 Jun" />
-          <TimelineRow color="bg-muted-foreground/50" label="Client informed of new date" date="14 Jun" />
+          <TimelineRow color="bg-muted-foreground/40" label="Client informed of new date" date="14 Jun" />
           <TimelineRow color="bg-primary" label="Hearing listed for arguments" date="24 Jun" />
         </ol>
       </article>

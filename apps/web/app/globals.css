@@ -4,139 +4,167 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Legal Owl — comforting off-dark theme. Soft dark slate surfaces (never pure
+  black), warm-soft off-white text, pastel mint-green primary + pastel lemon
+  accent. CSS-variable themeable: swap in one place.
+*/
 @theme inline {
   --font-sans: var(--font-sans);
   --font-serif: var(--font-serif);
   --font-mono: var(--font-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-lemon: var(--lemon);
+  --color-lemon-foreground: var(--lemon-foreground);
   --color-court: var(--court);
   --color-court-foreground: var(--court-foreground);
   --color-urgent: var(--urgent);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
 }
 
-/*
-  Legal Owl — pastel theme. Soft lavender canvas, periwinkle accent, gentle
-  pastel status hues. All tokens are CSS variables so the theme swaps in one place.
-*/
+/* Comforting off-dark is the default (no .dark class needed). */
 :root {
-  --radius: 0.75rem;
+  --radius: 1rem;
+  --tracking-normal: -0.01em;
 
-  --background: oklch(0.98 0.013 300); /* soft lavender paper */
-  --foreground: oklch(0.34 0.03 295);  /* soft plum ink */
+  --background: oklch(0.235 0.014 282); /* soft dark slate, never black */
+  --foreground: oklch(0.92 0.012 95); /* warm-soft off-white */
+  --card: oklch(0.275 0.014 282);
+  --card-foreground: oklch(0.93 0.012 95);
+  --popover: oklch(0.275 0.014 282);
+  --popover-foreground: oklch(0.93 0.012 95);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.34 0.03 295);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.34 0.03 295);
+  --primary: oklch(0.82 0.12 142); /* pastel mint-green */
+  --primary-foreground: oklch(0.24 0.03 150);
+  --secondary: oklch(0.32 0.02 282);
+  --secondary-foreground: oklch(0.92 0.012 95);
+  --muted: oklch(0.305 0.018 282);
+  --muted-foreground: oklch(0.73 0.016 286);
+  --accent: oklch(0.34 0.03 282);
+  --accent-foreground: oklch(0.9 0.06 142);
 
-  --primary: oklch(0.62 0.13 285); /* periwinkle — the accent */
-  --primary-foreground: oklch(0.99 0.005 285);
+  --lemon: oklch(0.88 0.15 101); /* pastel lemon */
+  --lemon-foreground: oklch(0.26 0.04 100);
 
-  --secondary: oklch(0.95 0.02 300);
-  --secondary-foreground: oklch(0.4 0.04 290);
-  --muted: oklch(0.955 0.018 300);
-  --muted-foreground: oklch(0.53 0.03 295);
-  --accent: oklch(0.93 0.04 290); /* soft lilac hover */
-  --accent-foreground: oklch(0.44 0.12 287);
+  --destructive: oklch(0.68 0.16 22);
+  --destructive-foreground: oklch(0.15 0 0);
+  --border: oklch(0.37 0.016 282);
+  --input: oklch(0.37 0.016 282);
+  --ring: oklch(0.82 0.12 142);
 
-  --destructive: oklch(0.63 0.15 15); /* pastel rose */
+  --court: oklch(0.82 0.12 142);
+  --court-foreground: oklch(0.24 0.03 150);
+  --urgent: oklch(0.68 0.16 22);
 
-  --border: oklch(0.9 0.018 300);
-  --input: oklch(0.9 0.018 300);
-  --ring: oklch(0.62 0.13 285);
+  --chart-1: oklch(0.82 0.12 142);
+  --chart-2: oklch(0.78 0.1 240);
+  --chart-3: oklch(0.85 0.13 100);
+  --chart-4: oklch(0.75 0.12 300);
+  --chart-5: oklch(0.8 0.12 20);
 
-  /* semantic helpers */
-  --court: oklch(0.62 0.13 285);
-  --court-foreground: oklch(0.99 0.005 285);
-  --urgent: oklch(0.63 0.15 15);
+  --sidebar: oklch(0.255 0.014 282);
+  --sidebar-foreground: oklch(0.92 0.012 95);
+  --sidebar-primary: oklch(0.82 0.12 142);
+  --sidebar-primary-foreground: oklch(0.24 0.03 150);
+  --sidebar-accent: oklch(0.34 0.03 282);
+  --sidebar-accent-foreground: oklch(0.9 0.06 142);
+  --sidebar-border: oklch(0.37 0.016 282);
+  --sidebar-ring: oklch(0.82 0.12 142);
 
-  /* pastel status / chart hues */
-  --chart-1: oklch(0.8 0.08 240); /* sky */
-  --chart-2: oklch(0.82 0.08 165); /* mint */
-  --chart-3: oklch(0.85 0.08 60); /* peach */
-  --chart-4: oklch(0.78 0.09 300); /* lilac */
-  --chart-5: oklch(0.81 0.09 10); /* rose */
-
-  --sidebar: oklch(0.97 0.016 300);
-  --sidebar-foreground: oklch(0.34 0.03 295);
-  --sidebar-primary: oklch(0.62 0.13 285);
-  --sidebar-primary-foreground: oklch(0.99 0.005 285);
-  --sidebar-accent: oklch(0.93 0.04 290);
-  --sidebar-accent-foreground: oklch(0.44 0.12 287);
-  --sidebar-border: oklch(0.9 0.018 300);
-  --sidebar-ring: oklch(0.62 0.13 285);
+  --shadow-2xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.2);
+  --shadow-xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.2);
+  --shadow-sm: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 1px 2px -1px hsl(0 0% 0% / 0.36);
+  --shadow: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 1px 2px -1px hsl(0 0% 0% / 0.36);
+  --shadow-md: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 2px 4px -1px hsl(0 0% 0% / 0.36);
+  --shadow-lg: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 4px 6px -1px hsl(0 0% 0% / 0.36);
+  --shadow-xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 8px 10px -1px hsl(0 0% 0% / 0.36);
+  --shadow-2xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.6);
 }
 
+/* keep .dark in sync so an explicit dark toggle behaves the same */
 .dark {
-  --background: oklch(0.2 0.02 295);
-  --foreground: oklch(0.95 0.01 300);
-  --card: oklch(0.24 0.02 295);
-  --card-foreground: oklch(0.95 0.01 300);
-  --popover: oklch(0.24 0.02 295);
-  --popover-foreground: oklch(0.95 0.01 300);
-  --primary: oklch(0.75 0.11 285);
-  --primary-foreground: oklch(0.2 0.02 295);
-  --secondary: oklch(0.3 0.02 295);
-  --secondary-foreground: oklch(0.95 0.01 300);
-  --muted: oklch(0.3 0.02 295);
-  --muted-foreground: oklch(0.72 0.02 297);
-  --accent: oklch(0.34 0.05 290);
-  --accent-foreground: oklch(0.92 0.04 290);
-  --destructive: oklch(0.7 0.15 15);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.75 0.11 285);
-  --court: oklch(0.75 0.11 285);
-  --court-foreground: oklch(0.2 0.02 295);
-  --urgent: oklch(0.7 0.15 15);
-  --chart-1: oklch(0.72 0.09 240);
-  --chart-2: oklch(0.74 0.09 165);
-  --chart-3: oklch(0.78 0.09 60);
-  --chart-4: oklch(0.72 0.1 300);
-  --chart-5: oklch(0.74 0.1 10);
-  --sidebar: oklch(0.24 0.02 295);
-  --sidebar-foreground: oklch(0.95 0.01 300);
-  --sidebar-primary: oklch(0.75 0.11 285);
-  --sidebar-primary-foreground: oklch(0.2 0.02 295);
-  --sidebar-accent: oklch(0.34 0.05 290);
-  --sidebar-accent-foreground: oklch(0.92 0.04 290);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.75 0.11 285);
+  --background: oklch(0.235 0.014 282);
+  --foreground: oklch(0.92 0.012 95);
+  --card: oklch(0.275 0.014 282);
+  --card-foreground: oklch(0.93 0.012 95);
+  --popover: oklch(0.275 0.014 282);
+  --popover-foreground: oklch(0.93 0.012 95);
+  --primary: oklch(0.82 0.12 142);
+  --primary-foreground: oklch(0.24 0.03 150);
+  --secondary: oklch(0.32 0.02 282);
+  --secondary-foreground: oklch(0.92 0.012 95);
+  --muted: oklch(0.305 0.018 282);
+  --muted-foreground: oklch(0.73 0.016 286);
+  --accent: oklch(0.34 0.03 282);
+  --accent-foreground: oklch(0.9 0.06 142);
+  --lemon: oklch(0.88 0.15 101);
+  --lemon-foreground: oklch(0.26 0.04 100);
+  --destructive: oklch(0.68 0.16 22);
+  --destructive-foreground: oklch(0.15 0 0);
+  --border: oklch(0.37 0.016 282);
+  --input: oklch(0.37 0.016 282);
+  --ring: oklch(0.82 0.12 142);
+  --court: oklch(0.82 0.12 142);
+  --court-foreground: oklch(0.24 0.03 150);
+  --urgent: oklch(0.68 0.16 22);
+  --chart-1: oklch(0.82 0.12 142);
+  --chart-2: oklch(0.78 0.1 240);
+  --chart-3: oklch(0.85 0.13 100);
+  --chart-4: oklch(0.75 0.12 300);
+  --chart-5: oklch(0.8 0.12 20);
+  --sidebar: oklch(0.255 0.014 282);
+  --sidebar-foreground: oklch(0.92 0.012 95);
+  --sidebar-primary: oklch(0.82 0.12 142);
+  --sidebar-primary-foreground: oklch(0.24 0.03 150);
+  --sidebar-accent: oklch(0.34 0.03 282);
+  --sidebar-accent-foreground: oklch(0.9 0.06 142);
+  --sidebar-border: oklch(0.37 0.016 282);
+  --sidebar-ring: oklch(0.82 0.12 142);
 }
 
 @layer base {
@@ -145,11 +173,37 @@
   }
   body {
     @apply bg-background text-foreground;
+    letter-spacing: var(--tracking-normal);
   }
   html {
     @apply font-sans;
   }
   .tnum {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Hero owl backdrop: a slowly-rotating conic-gradient ring + a breathing owl. */
+@keyframes owl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.owl-ring {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    var(--primary) 16%,
+    transparent 36%,
+    var(--lemon) 58%,
+    transparent 80%
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: owl-spin 32s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .owl-ring {
+    animation: none;
   }
 }
