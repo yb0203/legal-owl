@@ -13,9 +13,15 @@ import {
 import { fmtDate } from "@/lib/format";
 import { HearingPill } from "@/components/badges";
 import { SectionCard, EmptyState } from "@/components/page-header";
+import { PropertiesRail, type PropertyRow } from "@/components/record/properties-rail";
+import { AttributeValue } from "@/components/record/attribute-value";
+import { RuleHint } from "@/components/record/rule-hint";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addContact, dismissConflict } from "./actions";
+
+const CLIENT_TYPE_DOMAIN = ["Individual", "Organisation"] as const;
+const CLIENT_STATUS_DOMAIN = Object.values(CLIENT_STATUS_LABELS);
 
 interface MatterLite {
   id: string;
@@ -29,15 +35,6 @@ interface ConflictFlag {
   matched_name: string;
   note: string | null;
   matter_id: string | null;
-}
-
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right">{value}</dd>
-    </div>
-  );
 }
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -59,6 +56,41 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       supabase.from("matters").select("id, key, title, forum_type, next_hearing_date").eq("client_id", id).order("next_hearing_date", { ascending: true, nullsFirst: false }).returns<MatterLite[]>(),
       supabase.from("conflict_flags").select("id, matched_name, note, matter_id").eq("client_id", id).eq("status", "open").returns<ConflictFlag[]>(),
     ]);
+
+  const isOrg = client.type === "organisation";
+  const matterCount = matters?.length ?? 0;
+  const engagementCount = engagements?.length ?? 0;
+  const contactCount = contacts?.length ?? 0;
+
+  const detailRows: PropertyRow[] = [
+    {
+      label: "Type",
+      value: (
+        <AttributeValue
+          value={isOrg ? "Organisation" : "Individual"}
+          domain={CLIENT_TYPE_DOMAIN}
+        />
+      ),
+    },
+    {
+      label: "Status",
+      value: <AttributeValue value={CLIENT_STATUS_LABELS[client.status]} domain={CLIENT_STATUS_DOMAIN} />,
+    },
+    { label: "Email", value: client.email },
+    { label: "Phone", value: client.phone },
+    { label: "Address", value: client.address },
+    // GSTIN / PAN are organisation-only — omit entirely for individuals.
+    ...(isOrg
+      ? [
+          { label: "GSTIN", value: client.gstin ? <span className="font-mono tnum">{client.gstin}</span> : null },
+          { label: "PAN", value: client.pan ? <span className="font-mono tnum">{client.pan}</span> : null },
+        ]
+      : []),
+    { label: "Engagements", value: String(engagementCount) },
+    { label: "Matters", value: String(matterCount) },
+    { label: "Contacts", value: String(contactCount) },
+    { label: "Created", value: fmtDate(client.created_at) },
+  ];
 
   return (
     <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
@@ -123,22 +155,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="mt-6 space-y-6">
-        {(client.address || client.gstin || client.pan) && (
-          <SectionCard title="Details">
-            <dl className="divide-y">
-              <DetailRow label="Type" value={client.type === "organisation" ? "Organisation" : "Individual"} />
-              {client.address && <DetailRow label="Address" value={client.address} />}
-              {client.type === "organisation" && client.gstin && (
-                <DetailRow label="GSTIN" value={<span className="font-mono tnum">{client.gstin}</span>} />
-              )}
-              {client.pan && <DetailRow label="PAN" value={<span className="font-mono tnum">{client.pan}</span>} />}
-            </dl>
-          </SectionCard>
-        )}
+        <SectionCard title="Properties">
+          <div className="px-4 py-1">
+            <PropertiesRail items={detailRows} />
+          </div>
+        </SectionCard>
 
         <section>
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Matters</h2>
-          {(matters?.length ?? 0) === 0 ? (
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Matters ({matterCount})</h2>
+          {matterCount === 0 ? (
             <EmptyState title="No matters yet" />
           ) : (
             <ul className="divide-y overflow-hidden rounded-xl border">
@@ -160,9 +185,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           )}
         </section>
 
-        {(engagements?.length ?? 0) > 0 && (
+        {engagementCount > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Engagements</h2>
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className="text-sm font-medium text-muted-foreground">Engagements ({engagementCount})</h2>
+              <RuleHint>A &ldquo;General&rdquo; engagement is auto-created per client.</RuleHint>
+            </div>
             <ul className="divide-y overflow-hidden rounded-xl border">
               {engagements!.map((e) => (
                 <li key={e.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
@@ -174,9 +202,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </section>
         )}
 
-        <SectionCard title="Contacts">
+        <SectionCard title={`Contacts (${contactCount})`}>
           <ul className="divide-y">
-            {(contacts?.length ?? 0) === 0 && (
+            {contactCount === 0 && (
               <li className="px-4 py-4 text-center text-sm text-muted-foreground">No contacts yet.</li>
             )}
             {contacts!.map((c) => (
