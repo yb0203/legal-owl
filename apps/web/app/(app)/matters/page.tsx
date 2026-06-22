@@ -5,8 +5,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { HearingPill, MatterStatusBadge } from "@/components/badges";
+import { LabelChip } from "@/components/label-chip";
 import { HelpLink } from "@/components/help/help-link";
-import { FORUM_LABELS, type ForumType, type MatterStatus } from "@/lib/types";
+import { FORUM_LABELS, type ForumType, type Label, type MatterStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MatterRow {
@@ -30,9 +31,9 @@ const TABS = [
 export default async function MattersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; label?: string }>;
 }) {
-  const { q = "", status = "all" } = await searchParams;
+  const { q = "", status = "all", label = "" } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
@@ -51,7 +52,25 @@ export default async function MattersPage({
   if (q.trim()) query = query.or(`title.ilike.%${q}%,key.ilike.%${q}%,cnr.ilike.%${q}%`);
 
   const { data: rows } = await query.returns<MatterRow[]>();
-  const matters = rows ?? [];
+  let matters = rows ?? [];
+
+  // Labels: the filter-chip row + per-matter chips. Assignments are joined
+  // post-fetch (small data; mirrors the post-fetch style already in this file).
+  const [{ data: labelRows }, { data: assignmentRows }] = await Promise.all([
+    supabase.from("labels").select("id, name, color").order("name").returns<Label[]>(),
+    supabase.from("matter_labels").select("matter_id, label_id").returns<{ matter_id: string; label_id: string }[]>(),
+  ]);
+  const labels = labelRows ?? [];
+  const labelsByMatter: Record<string, Label[]> = {};
+  const labelById = new Map(labels.map((l) => [l.id, l]));
+  for (const a of assignmentRows ?? []) {
+    const l = labelById.get(a.label_id);
+    if (l) (labelsByMatter[a.matter_id] ??= []).push(l);
+  }
+  if (label) {
+    const tagged = new Set((assignmentRows ?? []).filter((a) => a.label_id === label).map((a) => a.matter_id));
+    matters = matters.filter((m) => tagged.has(m.id));
+  }
 
   // Per-tab counts so a lawyer sees the size of each bucket before clicking.
   const { data: statusRows } = await supabase
@@ -68,7 +87,9 @@ export default async function MattersPage({
   }
 
   const tabHref = (s: string) =>
-    `/matters?${new URLSearchParams({ ...(q ? { q } : {}), ...(s !== "all" ? { status: s } : {}) })}`;
+    `/matters?${new URLSearchParams({ ...(q ? { q } : {}), ...(label ? { label } : {}), ...(s !== "all" ? { status: s } : {}) })}`;
+  const labelHref = (id: string) =>
+    `/matters?${new URLSearchParams({ ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}), ...(id ? { label: id } : {}) })}`;
 
   return (
     <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
@@ -104,6 +125,27 @@ export default async function MattersPage({
           );
         })}
       </div>
+
+      {labels.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {labels.map((l) => {
+            const active = label === l.id;
+            return (
+              <Link
+                key={l.id}
+                href={labelHref(active ? "" : l.id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+                  active ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/40",
+                )}
+              >
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: l.color ?? "var(--muted-foreground)" }} />
+                {l.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       {matters.length === 0 ? (
         q ? (
@@ -146,6 +188,13 @@ export default async function MattersPage({
                     <span className="font-mono tnum">{m.key}</span>
                     {m.client && <span>· {m.client.display_name}</span>}
                   </div>
+                  {(labelsByMatter[m.id]?.length ?? 0) > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {labelsByMatter[m.id].map((l) => (
+                        <LabelChip key={l.id} label={l} />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {m.next_hearing_date ? (
                   <HearingPill date={m.next_hearing_date} />
