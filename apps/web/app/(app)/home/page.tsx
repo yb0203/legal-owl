@@ -9,6 +9,7 @@ import { Stat, EmptyState } from "@/components/page-header";
 import { TaskRow, type CrossTask } from "@/components/tasks-list";
 import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
+import { ModelOrientation } from "@/components/model-orientation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { seedSampleData } from "./actions";
 
@@ -200,11 +201,14 @@ export default async function HomePage() {
           <section>
             <h2 className="mb-3 text-sm font-medium text-muted-foreground">Your work</h2>
             {work.length === 0 ? (
-              <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-sm">
-                <CircleCheck className="size-4 shrink-0 text-primary" />
-                <span className="text-muted-foreground">
-                  You&apos;re clear for the week — nothing due in the next 7 days.
-                </span>
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-sm">
+                  <CircleCheck className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">
+                    You&apos;re clear for the week — nothing due in the next 7 days.
+                  </span>
+                </div>
+                {(openTasks ?? 0) === 0 && <ModelOrientation />}
               </div>
             ) : (
               <TimeGroups
@@ -239,6 +243,7 @@ function Onboarding() {
         </Link>
       </div>
       <p className="mt-4 text-xs text-muted-foreground">You can toggle sample data any time in Settings.</p>
+      <ModelOrientation className="mt-10 w-full text-left" />
     </main>
   );
 }
