@@ -2,6 +2,16 @@
 .env
 .env*.local
 
+# Deploy / tooling
+.vercel
+.mcp.json
+
+# Stray root tooling artifacts (shadcn CLI) — the real app lives in apps/web.
+# Root-anchored so apps/web's own package files are unaffected.
+/package.json
+/package-lock.json
+/node_modules/
+
 # OS / editor
 .DS_Store
 
