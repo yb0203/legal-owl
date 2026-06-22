@@ -34,8 +34,14 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const publicPaths = ["/", "/login", "/waitlist"];
-  const isPublic = publicPaths.includes(path);
+  // Public: landing, waitlist, the whole /login/* area (sign-in, password reset
+  // request + update), and /auth/* (the code-exchange callback the reset link hits
+  // while the user is still unauthenticated).
+  const isPublic =
+    path === "/" ||
+    path === "/waitlist" ||
+    path.startsWith("/login") ||
+    path.startsWith("/auth");
 
   // Unauthenticated users can only see public pages (landing, login, waitlist).
   if (!user && !isPublic) {
