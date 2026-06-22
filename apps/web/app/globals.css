@@ -93,8 +93,8 @@
 
   --destructive: oklch(0.68 0.16 22);
   --destructive-foreground: oklch(0.15 0 0);
-  --border: oklch(0.37 0.016 282);
-  --input: oklch(0.37 0.016 282);
+  --border: oklch(0.42 0.016 282); /* raised one step so cards/rows separate on dark */
+  --input: oklch(0.4 0.016 282);
   --ring: oklch(0.82 0.12 142);
 
   --court: oklch(0.82 0.12 142);
@@ -113,17 +113,19 @@
   --sidebar-primary-foreground: oklch(0.24 0.03 150);
   --sidebar-accent: oklch(0.34 0.03 282);
   --sidebar-accent-foreground: oklch(0.9 0.06 142);
-  --sidebar-border: oklch(0.37 0.016 282);
+  --sidebar-border: oklch(0.42 0.016 282);
   --sidebar-ring: oklch(0.82 0.12 142);
 
-  --shadow-2xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.2);
-  --shadow-xs: 0px 10px 25px 0px hsl(0 0% 0% / 0.2);
-  --shadow-sm: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 1px 2px -1px hsl(0 0% 0% / 0.36);
-  --shadow: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 1px 2px -1px hsl(0 0% 0% / 0.36);
-  --shadow-md: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 2px 4px -1px hsl(0 0% 0% / 0.36);
-  --shadow-lg: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 4px 6px -1px hsl(0 0% 0% / 0.36);
-  --shadow-xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.36), 0px 8px 10px -1px hsl(0 0% 0% / 0.36);
-  --shadow-2xl: 0px 10px 25px 0px hsl(0 0% 0% / 0.6);
+  /* Subtle, low-spread elevation tuned for a dark canvas (depth comes from
+     borders + these; not the old light-UI 25px blur that read as nothing). */
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.2);
+  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.24);
+  --shadow-sm: 0px 1px 3px 0px hsl(0 0% 0% / 0.28), 0px 1px 2px -1px hsl(0 0% 0% / 0.28);
+  --shadow: 0px 1px 3px 0px hsl(0 0% 0% / 0.28), 0px 1px 2px -1px hsl(0 0% 0% / 0.28);
+  --shadow-md: 0px 2px 6px -1px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.28);
+  --shadow-lg: 0px 8px 16px -4px hsl(0 0% 0% / 0.36), 0px 2px 4px -2px hsl(0 0% 0% / 0.3);
+  --shadow-xl: 0px 14px 28px -6px hsl(0 0% 0% / 0.42);
+  --shadow-2xl: 0px 24px 48px -12px hsl(0 0% 0% / 0.55);
 }
 
 /* keep .dark in sync so an explicit dark toggle behaves the same */
@@ -146,8 +148,8 @@
   --lemon-foreground: oklch(0.26 0.04 100);
   --destructive: oklch(0.68 0.16 22);
   --destructive-foreground: oklch(0.15 0 0);
-  --border: oklch(0.37 0.016 282);
-  --input: oklch(0.37 0.016 282);
+  --border: oklch(0.42 0.016 282);
+  --input: oklch(0.4 0.016 282);
   --ring: oklch(0.82 0.12 142);
   --court: oklch(0.82 0.12 142);
   --court-foreground: oklch(0.24 0.03 150);
@@ -163,7 +165,7 @@
   --sidebar-primary-foreground: oklch(0.24 0.03 150);
   --sidebar-accent: oklch(0.34 0.03 282);
   --sidebar-accent-foreground: oklch(0.9 0.06 142);
-  --sidebar-border: oklch(0.37 0.016 282);
+  --sidebar-border: oklch(0.42 0.016 282);
   --sidebar-ring: oklch(0.82 0.12 142);
 }
 

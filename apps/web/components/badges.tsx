@@ -11,14 +11,16 @@ import {
 import { cn } from "@/lib/utils";
 import {
   FORUM_LABELS,
+  MATTER_STATUS_LABELS,
   PRIORITY_LABELS,
   STATE_TYPE_LABELS,
   type ActionPriority,
   type EventSource,
   type ForumType,
+  type MatterStatus,
   type StateType,
 } from "@/lib/types";
-import { fmtDate, isOverdue, isToday, relativeDay } from "@/lib/format";
+import { fmtDate, isOverdue, isThisWeek, isToday, relativeDay } from "@/lib/format";
 
 // Status by shape-then-color: each state type gets a distinct glyph AND hue, so
 // it reads in a glance and survives colour-blindness / sunlight.
@@ -51,6 +53,23 @@ export function StatusBadge({
   );
 }
 
+// Calm "dot + label" matter-status chip — low-saturation so it never competes
+// with the overdue/urgency signal, which must stay the loudest thing on a row.
+const MATTER_STATUS_STYLE: Record<MatterStatus, string> = {
+  active: "bg-primary",
+  on_hold: "bg-lemon",
+  disposed: "bg-muted-foreground",
+};
+
+export function MatterStatusBadge({ status }: { status: MatterStatus }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className={cn("size-1.5 rounded-full", MATTER_STATUS_STYLE[status])} />
+      {MATTER_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 const PRIORITY_TONE: Record<ActionPriority, string> = {
   none: "text-muted-foreground",
   low: "text-muted-foreground",
@@ -78,13 +97,17 @@ export function DueDateBadge({
   if (!date) return null;
   const overdue = isOverdue(date);
   const today = isToday(date);
+  const week = isThisWeek(date);
   return (
     <span
       className={cn(
         "tnum inline-flex items-center rounded px-1.5 py-0.5 text-xs",
+        // Urgency hierarchy: solid red (overdue) → red tint (today) →
+        // amber/lemon (this week) → muted (later). Overdue stays loudest.
         overdue && "bg-urgent text-white font-medium",
-        today && !overdue && "bg-urgent/15 text-urgent font-medium",
-        !overdue && !today && "text-muted-foreground",
+        today && "bg-urgent/15 text-urgent font-medium",
+        week && "text-lemon font-medium",
+        !overdue && !today && !week && "text-muted-foreground",
       )}
     >
       {prefix} {fmtDate(date)}
@@ -96,13 +119,20 @@ export function HearingPill({ date }: { date?: string | null }) {
   if (!date) return <span className="text-sm text-muted-foreground">No date</span>;
   const overdue = isOverdue(date);
   const today = isToday(date);
+  const week = isThisWeek(date);
   return (
     <span className="inline-flex items-baseline gap-2">
       <span className="tnum text-base font-semibold">{fmtDate(date)}</span>
       <span
         className={cn(
           "text-xs",
-          today ? "font-medium text-urgent" : overdue ? "text-urgent" : "text-muted-foreground",
+          today
+            ? "font-medium text-urgent"
+            : overdue
+              ? "text-urgent"
+              : week
+                ? "text-lemon"
+                : "text-muted-foreground",
         )}
       >
         {relativeDay(date)}

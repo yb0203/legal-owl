@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { HelpLink } from "@/components/help/help-link";
 import { CLIENT_STATUS_LABELS, type ClientStatus, type ClientType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -35,14 +36,29 @@ export default async function ClientsPage({
     .from("clients")
     .select("id, display_name, type, status, email, phone, matters:matters(count)")
     .order("display_name", { ascending: true });
-  if (q.trim()) query = query.ilike("display_name", `%${q}%`);
+  if (q.trim()) {
+    // Strip PostgREST filter metacharacters (, ( ) " \) so a name like
+    // "Acme, Inc. (India)" can't corrupt the .or() expression.
+    const term = q.trim().replace(/[,()"\\]/g, " ").trim();
+    if (term) {
+      query = query.or(`display_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`);
+    }
+  }
 
   const { data: rows } = await query.returns<ClientRow[]>();
   const clients = rows ?? [];
 
   return (
     <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
-      <PageHeader title="Clients" subtitle="People and organisations you act for.">
+      <PageHeader
+        title="Clients"
+        subtitle={
+          q
+            ? `${clients.length} match${clients.length === 1 ? "" : "es"} for “${q}”`
+            : `${clients.length} client${clients.length === 1 ? "" : "s"}`
+        }
+      >
+        <HelpLink anchor="clients" label="Clients" />
         <Link href="/clients/new" className={buttonVariants({ size: "sm" })}>
           + New client
         </Link>
@@ -50,21 +66,33 @@ export default async function ClientsPage({
 
       <form className="relative mb-4" action="/clients">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input name="q" defaultValue={q} placeholder="Search clients…" className="pl-9" />
+        <Input name="q" defaultValue={q} placeholder="Search by name, email or phone…" className="pl-9" />
       </form>
 
       {clients.length === 0 ? (
-        <EmptyState
-          title={q ? "No clients match your search" : "No clients yet"}
-          hint={q ? undefined : "Add your first client — we'll run a conflict check as you go."}
-          action={
-            !q ? (
+        q ? (
+          <EmptyState
+            variant="no-results"
+            title="No clients match your search"
+            description="Try a different name, email, or phone — or clear the search."
+            action={
+              <Link href="/clients" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Clear search
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={User}
+            title="No clients yet"
+            description="Add your first client — we'll run a conflict check against your existing matters as you go."
+            action={
               <Link href="/clients/new" className={buttonVariants({ size: "sm" })}>
                 + New client
               </Link>
-            ) : undefined
-          }
-        />
+            }
+          />
+        )
       ) : (
         <ul className="divide-y overflow-hidden rounded-xl border">
           {clients.map((c) => (

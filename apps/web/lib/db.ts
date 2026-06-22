@@ -1,5 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Parties } from "@/lib/types";
+import type { Parties, WorkflowState } from "@/lib/types";
+
+/** The shared system workflow states (lawyer_id null), ordered by position. */
+export async function getSystemWorkflowStates(
+  supabase: SupabaseClient,
+): Promise<WorkflowState[]> {
+  const { data } = await supabase
+    .from("workflow_states")
+    .select("id, name, type, position")
+    .is("lawyer_id", null)
+    .order("position")
+    .returns<WorkflowState[]>();
+  return data ?? [];
+}
 
 // Shared, reusable data helpers. These take the request-scoped (authed) Supabase
 // client so RLS applies — they are NOT server actions themselves.

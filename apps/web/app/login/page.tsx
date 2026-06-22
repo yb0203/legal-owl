@@ -29,7 +29,15 @@ export default async function LoginPage({
           <Input id="email" name="email" type="email" required placeholder="you@chambers.in" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              href="/login/reset"
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Input id="password" name="password" type="password" required placeholder="Min. 6 characters" />
         </div>
 
@@ -40,9 +48,13 @@ export default async function LoginPage({
             Sign in
           </Button>
           <Button type="submit" formAction={signup} variant="outline" className="w-full">
-            Create account
+            Request access
           </Button>
         </div>
+        <p className="text-center text-xs text-muted-foreground">
+          New here? Requesting access adds you to the waitlist — we&apos;ll email you when your account
+          is approved.
+        </p>
       </form>
     </AuthShell>
   );

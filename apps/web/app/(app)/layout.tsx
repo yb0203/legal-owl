@@ -18,11 +18,28 @@ export default async function AppLayout({
   if (!user) redirect("/login");
   if (!(await getWaitlistAccess(supabase, user.email))) redirect("/waitlist");
 
-  const [{ count: inboxCount }, { data: matters }] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [
+    { count: inboxCount },
+    { count: tasksDueToday },
+    { count: hearingsToday },
+    { data: matters },
+  ] = await Promise.all([
     supabase
       .from("triage_items")
       .select("id", { count: "exact", head: true })
       .eq("state", "pending"),
+    // "Due today" badge counts what needs action now: due today or already overdue.
+    supabase
+      .from("actions")
+      .select("id", { count: "exact", head: true })
+      .is("completed_at", null)
+      .lte("due_date", today),
+    supabase
+      .from("hearings")
+      .select("id", { count: "exact", head: true })
+      .eq("state", "scheduled")
+      .eq("hearing_date", today),
     supabase
       .from("matters")
       .select("id, title, key")
@@ -33,7 +50,12 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar email={user.email} inboxCount={inboxCount ?? 0} />
+      <AppSidebar
+        email={user.email}
+        inboxCount={inboxCount ?? 0}
+        tasksDueToday={tasksDueToday ?? 0}
+        hearingsToday={hearingsToday ?? 0}
+      />
       <SidebarInset>
         <AppHeader matters={matters ?? []} />
         {children}

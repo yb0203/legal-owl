@@ -205,7 +205,7 @@ export async function uploadDocument(formData: FormData) {
   });
   if (error) return;
 
-  await supabase.from("documents").insert({
+  const { error: docError } = await supabase.from("documents").insert({
     lawyer_id: user.id,
     matter_id: matterId,
     name: file.name,
@@ -213,6 +213,21 @@ export async function uploadDocument(formData: FormData) {
     mime_type: file.type || null,
     size_bytes: file.size,
     source: String(formData.get("source") || "lawyer_upload"),
+  });
+  // If the row failed, drop the orphaned blob and stop — no timeline entry.
+  if (docError) {
+    await supabase.storage.from("case-documents").remove([path]);
+    return;
+  }
+  // Surface the upload on the matter timeline. content_hash is NOT NULL with a
+  // unique(matter_id, content_hash) constraint — key it to the unique storage path.
+  await supabase.from("court_events").insert({
+    lawyer_id: user.id,
+    matter_id: matterId,
+    event_type: "document_added",
+    new_value: file.name,
+    source_type: "system",
+    content_hash: `document_added:${path}`,
   });
   revalidatePath(`/matters/${matterId}`);
 }
@@ -233,8 +248,19 @@ export async function deleteDocument(formData: FormData) {
   if (!docId) return;
   const { supabase, user } = await authed();
   if (!user) return;
+  const name = String(formData.get("doc_name") || "").trim();
+  // Delete the row first; only touch storage + timeline if it succeeded.
+  const { error: delError } = await supabase.from("documents").delete().eq("id", docId);
+  if (delError) return;
   if (path) await supabase.storage.from("case-documents").remove([path]);
-  await supabase.from("documents").delete().eq("id", docId);
+  await supabase.from("court_events").insert({
+    lawyer_id: user.id,
+    matter_id: matterId,
+    event_type: "document_removed",
+    new_value: name || null,
+    source_type: "system",
+    content_hash: `document_removed:${docId}:${Date.now()}`,
+  });
   revalidatePath(`/matters/${matterId}`);
 }
 

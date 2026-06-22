@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Landmark, AlarmClock } from "lucide-react";
+import { Landmark, AlarmClock, CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { HelpLink } from "@/components/help/help-link";
 import { fmtDateYear, relativeDay, isToday, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -29,20 +30,20 @@ interface AgendaItem {
 
 export default async function CalendarPage() {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
 
+  // No date floor: a missed hearing or a passed limitation date must stay
+  // visible (hiding overdue is malpractice-grade). We fetch scheduled hearings
+  // and all deadlines, then surface overdue first.
   const [{ data: hearings }, { data: deadlines }] = await Promise.all([
     supabase
       .from("hearings")
       .select("id, hearing_date, purpose, matter:matters(id, title)")
       .eq("state", "scheduled")
-      .gte("hearing_date", today)
       .order("hearing_date", { ascending: true })
       .returns<HearingRow[]>(),
     supabase
       .from("deadlines")
       .select("id, due_date, type, basis, matter:matters(id, title)")
-      .gte("due_date", today)
       .order("due_date", { ascending: true })
       .returns<DeadlineRow[]>(),
   ]);
@@ -64,21 +65,61 @@ export default async function CalendarPage() {
     })),
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  // Group by date, preserving chronological order.
+  // Overdue is pinned first and loudest; the rest stays date-grouped & chronological.
+  const overdueItems = items.filter((it) => isOverdue(it.date));
+  const upcomingItems = items.filter((it) => !isOverdue(it.date));
+
   const groups = new Map<string, AgendaItem[]>();
-  for (const it of items) {
+  for (const it of upcomingItems) {
     if (!groups.has(it.date)) groups.set(it.date, []);
     groups.get(it.date)!.push(it);
   }
 
+  const renderRow = (it: AgendaItem) => (
+    <li key={it.key} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
+      {it.kind === "hearing" ? (
+        <Landmark className="size-4 shrink-0 text-primary" />
+      ) : (
+        <AlarmClock className={cn("size-4 shrink-0", isOverdue(it.date) ? "text-urgent" : "text-lemon")} />
+      )}
+      <span className="min-w-0 flex-1 truncate">{it.label}</span>
+      <span className={cn("tnum shrink-0 text-xs", isOverdue(it.date) ? "text-urgent" : "text-muted-foreground")}>
+        {relativeDay(it.date)}
+      </span>
+      {it.matter && (
+        <Link href={`/matters/${it.matter.id}`} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
+          {it.matter.title}
+        </Link>
+      )}
+    </li>
+  );
+
   return (
     <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
-      <PageHeader title="Calendar" subtitle="Upcoming hearings and deadlines across all your matters." />
+      <PageHeader title="Calendar" subtitle="Hearings and deadlines across all your matters.">
+        <HelpLink anchor="calendar" label="Calendar" />
+      </PageHeader>
 
-      {groups.size === 0 ? (
-        <EmptyState title="Nothing scheduled" hint="Hearings and deadlines you add to matters will appear here." />
+      {items.length === 0 ? (
+        <EmptyState
+          icon={CalendarDays}
+          title="Nothing scheduled yet"
+          description="Hearings and deadlines you add to a matter show up here, grouped by day — with anything overdue pinned to the top so it never slips."
+        />
       ) : (
         <div className="space-y-6">
+          {overdueItems.length > 0 && (
+            <section>
+              <div className="mb-2 flex items-baseline gap-2">
+                <h2 className="font-serif text-base font-semibold tracking-tight text-urgent">Overdue</h2>
+                <span className="tnum text-xs font-medium text-urgent">{overdueItems.length}</span>
+              </div>
+              <ul className="divide-y overflow-hidden rounded-xl border border-urgent/40">
+                {overdueItems.map(renderRow)}
+              </ul>
+            </section>
+          )}
+
           {Array.from(groups.entries()).map(([date, dayItems]) => {
             const isTodayDate = isToday(date);
             return (
@@ -89,23 +130,7 @@ export default async function CalendarPage() {
                     {relativeDay(date)}
                   </span>
                 </div>
-                <ul className="divide-y overflow-hidden rounded-xl border">
-                  {dayItems.map((it) => (
-                    <li key={it.key} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
-                      {it.kind === "hearing" ? (
-                        <Landmark className="size-4 shrink-0 text-primary" />
-                      ) : (
-                        <AlarmClock className={cn("size-4 shrink-0", isOverdue(it.date) ? "text-urgent" : "text-lemon")} />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                      {it.matter && (
-                        <Link href={`/matters/${it.matter.id}`} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
-                          {it.matter.title}
-                        </Link>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <ul className="divide-y overflow-hidden rounded-xl border">{dayItems.map(renderRow)}</ul>
               </section>
             );
           })}

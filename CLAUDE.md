@@ -5,20 +5,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Repository state
 
 The production app lives in **`apps/web`** (Next.js App Router on Vercel + Supabase in Mumbai). A
-Streamlit eCourts prototype lives in `prototype/ecourts-streamlit/` (reference only). `STRATEGY.md`
-is the source of truth for product direction; `docs/ARCHITECTURE.md` and `docs/specs/` are the
-durable technical/requirements docs.
+Streamlit eCourts prototype lives in `prototype/ecourts-streamlit/` (reference only; it has its own
+pytest suite and migrations — the web app does not). `STRATEGY.md` is the source of truth for product
+direction; `docs/ARCHITECTURE.md` and `docs/specs/` are the durable technical/requirements docs, with
+supporting `docs/research/`, `docs/plans/`, and `docs/design/frontend-design-learnings.md`.
 
 ### Web app — `apps/web`
 
+Stack: Next.js 16 (App Router, Turbopack by default), React 19, Tailwind v4, TypeScript strict
+(`@/*` → `apps/web/*`). The repo root has its own `package.json` (only the `shadcn` CLI) and a
+`.mcp.json` registering the **shadcn MCP server**; all app work happens in `apps/web`.
+
 Commands (run inside `apps/web`):
 
-- `npm run dev` — local dev server (Turbopack)
+- `npm run dev` — local dev server
 - `npm run build` — production build (runs `tsc` typecheck + route generation; the green-build gate)
-- `npm run lint` — ESLint (Next)
+- `npm run lint` — `next lint` (deprecated in Next 16; there is no ESLint config, so don't rely on it)
 - `npm run typecheck` — `tsc --noEmit`
 
-There is **no test suite yet**; `npm run build` is the correctness gate after changes.
+There is **no test suite yet**; `npm run build` (and `npm run typecheck`) is the correctness gate after
+changes.
 
 Architecture & conventions:
 
@@ -27,27 +33,33 @@ Architecture & conventions:
   Reads happen in Server Components; writes are **Server Actions** co-located in each route's
   `actions.ts` (form actions read a hidden id; programmatic actions take args and are called from
   client islands via `useTransition`).
-- **Supabase** (`@supabase/ssr`, cookie-per-request). RLS on every table keyed on
-  `auth.uid() = lawyer_id`. Schema in `supabase/migrations/`; apply with
-  `supabase db push --db-url "$DBURL"` using the session pooler (URL-encode the DB password with
-  `safe=''` — a literal `/` in it otherwise breaks URL parsing). Private Storage bucket
-  `case-documents` holds uploaded files at path `${lawyer_id}/${matter_id}/<file>`.
+- **Supabase** (`@supabase/ssr`, cookie-per-request). Clients live in `lib/supabase/`
+  (`client.ts` browser, `server.ts` RSC/actions, `middleware.ts` session refresh wired through the
+  app's `middleware.ts`). RLS on every table keyed on `auth.uid() = lawyer_id`. Schema in
+  `supabase/migrations/` (`config.toml` alongside); apply with `supabase db push --db-url "$DBURL"`
+  using the session pooler (URL-encode the DB password with `safe=''` — a literal `/` in it
+  otherwise breaks URL parsing). Private Storage bucket `case-documents` holds uploaded files at path
+  `${lawyer_id}/${matter_id}/<file>`. Outbound email goes through **Resend** (`lib/email.ts`).
 - **Domain hierarchy: Client → Engagement → Matter → Action** (a "General" engagement is
   auto-created per client). Matter is the case file (internal id + optional CNR); Action is the
   task. Hearings, Deadlines, Documents, append-only `court_events` + immutable `remarks` (merged at
   read time into the timeline), and `triage_items` (the Inbox) all hang off Matter.
-- **UI: shadcn on the Base UI registry (NOT Radix).** Components use the `render` prop, not
-  `asChild`; Base UI `Button`/menu items default to `type="button"` (always set `type="submit"` on
-  form buttons). Shared design-system atoms live in `components/` (`badges.tsx`, `page-header.tsx`),
-  shared types/utils in `lib/types.ts` and `lib/format.ts` (dates render `dd-MMM`), shared data
-  helpers in `lib/db.ts`.
+- **UI: shadcn on the Base UI registry (NOT Radix).** `components.json` style is `base-nova`,
+  base color `neutral`, icons `lucide`. Components use the `render` prop, not `asChild`; Base UI
+  `Button`/menu items default to `type="button"` (always set `type="submit"` on form buttons). Add
+  components via the shadcn MCP / CLI. Toasts use `sonner`; the command palette uses `cmdk`. Shared
+  design-system atoms live in `components/` (`badges.tsx`, `page-header.tsx`), shared types/utils in
+  `lib/types.ts` and `lib/format.ts` (dates render `dd-MMM`), data helpers in `lib/db.ts`, and
+  `lib/auth.ts` / `lib/redirect.ts` / `lib/utils.ts` round out the helpers.
 - **Nomenclature (neutral-professional):** nav is `Home · Calendar · Matters · Inbox · Tasks ·
   Clients · Settings`. Internal `workflow_states` names (To-Do, Awaiting Filing, …) are rendered via
   `StatusBadge`.
 - **Theme is a deliberate off-dark mint/lemon palette** (`app/globals.css`), chosen by the user —
   do NOT "fix" it back to the light "legal ledger" look described in `docs/design/`. Fonts: Geist
   (sans), Geist Mono (case numbers/CNRs), Source Serif 4 (headings).
-- Secrets live in gitignored `.env` (root) and `apps/web/.env.local` — never commit them.
+- Secrets live in gitignored `.env` (root: Supabase admin/`SUPABASE_DB_PASSWORD`, `RESEND_API_KEY`,
+  `ECOURTS_API_KEY`) and `apps/web/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`) — never commit them. No `.env.example` exists yet.
 
 ## Product context
 
