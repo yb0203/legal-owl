@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   FORUM_LABELS,
@@ -10,7 +10,7 @@ import {
   type WorkflowState,
 } from "@/lib/types";
 import { fmtDate, fmtDateYear } from "@/lib/format";
-import { CNRChip, ForumBadge, HearingPill, SourceChip } from "@/components/badges";
+import { ForumBadge, HearingPill, SourceChip } from "@/components/badges";
 import { EmptyState } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatterStatusControl } from "@/components/matter/matter-status";
 import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
+import { CopyChip } from "@/components/matter/copy-chip";
+import { ConfirmDeleteDocument } from "@/components/matter/confirm-delete-document";
 import { TaskList, type TaskRow } from "@/components/matter/task-list";
 import {
   addRemark,
@@ -26,7 +28,6 @@ import {
   addDeadline,
   uploadDocument,
   downloadDocument,
-  deleteDocument,
 } from "./actions";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -34,6 +35,8 @@ const EVENT_LABELS: Record<string, string> = {
   hearing_date_changed: "Hearing date changed",
   status_changed: "Status changed",
   judge_changed: "Judge changed",
+  document_added: "Document added",
+  document_removed: "Document removed",
 };
 
 const DEADLINE_LABELS: Record<string, string> = {
@@ -146,7 +149,8 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <ForumBadge forum={matter.forum_type} />
           {matter.case_type && <span className="text-muted-foreground">{matter.case_type}</span>}
-          <CNRChip cnr={matter.cnr} />
+          <CopyChip value={matter.key} label="Matter id" />
+          {matter.cnr && <CopyChip value={matter.cnr} label="CNR" />}
           {matter.client && (
             <Link href={`/clients/${matter.client.id}`} className="text-muted-foreground hover:text-foreground">
               {matter.client.display_name}
@@ -310,14 +314,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
                     <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
                   </form>
                   <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
-                  <form action={deleteDocument} className="shrink-0">
-                    <input type="hidden" name="doc_id" value={d.id} />
-                    <input type="hidden" name="matter_id" value={id} />
-                    <input type="hidden" name="storage_path" value={d.storage_path} />
-                    <button type="submit" aria-label="Delete document" className="text-muted-foreground hover:text-urgent">
-                      <Trash2 className="size-4" />
-                    </button>
-                  </form>
+                  <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path} name={d.name} />
                 </li>
               ))}
             </ul>

@@ -1,17 +1,10 @@
+import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
 import { DemoToggle } from "@/components/demo-toggle";
+import { ProfileForm, type ProfileValues } from "@/components/settings/profile-form";
 import { PageHeader, SectionCard } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="truncate text-right">{value}</dd>
-    </div>
-  );
-}
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -19,27 +12,41 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { count: demoCount } = await supabase
-    .from("matters")
-    .select("id", { count: "exact", head: true })
-    .like("key", "DEMO-%");
+  const [{ count: demoCount }, { data: profile }] = await Promise.all([
+    supabase.from("matters").select("id", { count: "exact", head: true }).like("key", "DEMO-%"),
+    supabase
+      .from("profiles")
+      .select("full_name, firm_name, phone, bar_enrolment")
+      .eq("id", user?.id ?? "")
+      .maybeSingle<ProfileValues>(),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-2xl p-6 sm:p-8">
       <PageHeader title="Settings" subtitle="Your account and preferences." />
 
       <div className="space-y-6">
+        <SectionCard title="Profile">
+          <ProfileForm email={user?.email} profile={profile ?? null} />
+        </SectionCard>
+
+        <SectionCard title="Data residency">
+          <div className="flex items-start gap-3 p-4">
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+            <div className="text-sm">
+              <p className="font-medium">Your data stays in India</p>
+              <p className="text-muted-foreground">
+                Case data, documents and identity are stored in Mumbai (ap-south-1) and never leave the
+                country.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+
         <SectionCard title="Explore">
           <div className="p-4">
             <DemoToggle enabled={(demoCount ?? 0) > 0} />
           </div>
-        </SectionCard>
-
-        <SectionCard title="Profile">
-          <dl className="divide-y">
-            <Row label="Email" value={user?.email} />
-            <Row label="Data residency" value="Mumbai, India (ap-south-1)" />
-          </dl>
         </SectionCard>
 
         <SectionCard title="eCourts connection">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, User, TriangleAlert, ChevronRight } from "lucide-react";
+import { ArrowLeft, Building2, User, TriangleAlert, ChevronRight, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   CLIENT_STATUS_LABELS,
@@ -29,6 +29,15 @@ interface ConflictFlag {
   matched_name: string;
   note: string | null;
   matter_id: string | null;
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right">{value}</dd>
+    </div>
+  );
 }
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -78,6 +87,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </Link>
       </header>
 
+      {(flags?.length ?? 0) === 0 && (
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-primary">
+          <ShieldCheck className="size-4" />
+          No conflicts found
+        </div>
+      )}
+
       {(flags?.length ?? 0) > 0 && (
         <div className="mt-6 rounded-xl border border-urgent/40 bg-urgent/10 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-urgent">
@@ -107,6 +123,19 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="mt-6 space-y-6">
+        {(client.address || client.gstin || client.pan) && (
+          <SectionCard title="Details">
+            <dl className="divide-y">
+              <DetailRow label="Type" value={client.type === "organisation" ? "Organisation" : "Individual"} />
+              {client.address && <DetailRow label="Address" value={client.address} />}
+              {client.type === "organisation" && client.gstin && (
+                <DetailRow label="GSTIN" value={<span className="font-mono tnum">{client.gstin}</span>} />
+              )}
+              {client.pan && <DetailRow label="PAN" value={<span className="font-mono tnum">{client.pan}</span>} />}
+            </dl>
+          </SectionCard>
+        )}
+
         <section>
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">Matters</h2>
           {(matters?.length ?? 0) === 0 ? (

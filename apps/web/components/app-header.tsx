@@ -12,25 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CommandPalette } from "@/components/command-palette";
+import { titleForPath } from "@/lib/nav";
 
-const TITLES: Record<string, string> = {
-  home: "Home",
-  matters: "Matters",
-  inbox: "Inbox",
-  tasks: "Tasks",
-  calendar: "Calendar",
-  clients: "Clients",
-  settings: "Settings",
-};
-
-function titleFor(pathname: string): string {
-  const segs = pathname.split("/").filter(Boolean);
-  const [first, second] = segs;
-  if (first === "matters" && second === "new") return "New matter";
-  if (first === "matters" && second) return "Matter";
-  if (first === "clients" && second === "new") return "New client";
-  if (first === "clients" && second) return "Client";
-  return TITLES[first] ?? "Legal Owl";
+// Breadcrumb context for sub-pages only. Top-level pages render their own H1 via
+// PageHeader, so the header stays clean (no duplicated title).
+function crumbFor(pathname: string): { parent: string; parentHref: string } | null {
+  const [first, second] = pathname.split("/").filter(Boolean);
+  if (first === "matters" && second) return { parent: "Matters", parentHref: "/matters" };
+  if (first === "clients" && second) return { parent: "Clients", parentHref: "/clients" };
+  return null;
 }
 
 export function AppHeader({
@@ -39,11 +29,20 @@ export function AppHeader({
   matters?: { id: string; title: string; key: string }[];
 }) {
   const pathname = usePathname();
+  const crumb = crumbFor(pathname);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur">
       <SidebarTrigger />
-      <h1 className="font-serif text-base font-semibold tracking-tight">{titleFor(pathname)}</h1>
+      {crumb && (
+        <nav className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <Link href={crumb.parentHref} className="hover:text-foreground">
+            {crumb.parent}
+          </Link>
+          <span aria-hidden>/</span>
+          <span className="truncate text-foreground">{titleForPath(pathname)}</span>
+        </nav>
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <CommandPalette matters={matters} />

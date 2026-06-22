@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { joinWaitlist } from "./waitlist/actions";
+import { createClient } from "@/lib/supabase/server";
 import { Wordmark } from "@/components/wordmark";
 import { OwlMark } from "@/components/owl-mark";
 import { Reveal } from "@/components/reveal";
@@ -26,6 +28,12 @@ export default async function LandingPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+
+  // Social proof: real waitlist size (RLS may hide it for anon → fall back to none).
+  const supabase = await createClient();
+  const { count: waitlistCount } = await supabase
+    .from("waitlist")
+    .select("id", { count: "exact", head: true });
 
   return (
     <div className="relative min-h-screen overflow-x-clip">
@@ -68,7 +76,7 @@ export default async function LandingPage({
               informed — grounded in real case data, never guesswork.
             </p>
 
-            <form action={joinWaitlist} className="mt-10 flex max-w-md flex-col gap-2 sm:flex-row">
+            <form id="waitlist" action={joinWaitlist} className="mt-10 flex max-w-md scroll-mt-24 flex-col gap-2 sm:flex-row">
               <Input
                 name="email"
                 type="email"
@@ -89,6 +97,17 @@ export default async function LandingPage({
               </Link>
               .
             </p>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="size-4 text-primary" />
+                Your data stays in India
+              </span>
+              {(waitlistCount ?? 0) > 0 && (
+                <span className="tnum">
+                  {waitlistCount} lawyer{waitlistCount === 1 ? "" : "s"} on the waitlist
+                </span>
+              )}
+            </div>
           </div>
         </section>
 
@@ -148,7 +167,7 @@ export default async function LandingPage({
           <h2 className="mx-auto max-w-2xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl">
             Be among the first lawyers on Legal Owl.
           </h2>
-          <Link href="#top" className={buttonVariants({ size: "lg", className: "mt-8 h-12 px-7 text-base" })}>
+          <Link href="#waitlist" className={buttonVariants({ size: "lg", className: "mt-8 h-12 px-7 text-base" })}>
             Join the waitlist
           </Link>
         </Reveal>

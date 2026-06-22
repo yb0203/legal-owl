@@ -1,5 +1,14 @@
 import Link from "next/link";
+import { SearchX, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 // Standard page heading: serif title, optional subtitle, right-aligned actions.
 export function PageHeader({
@@ -48,21 +57,52 @@ export function SectionCard({
   );
 }
 
+// Educational empty state: an icon, a title, a sentence of "what this is / why
+// it helps", and up to two actions. `variant="no-results"` is for filtered-empty
+// (different from never-created). `hint` is kept as a back-compat alias for
+// `description`.
 export function EmptyState({
+  icon: Icon,
   title,
   hint,
+  description,
   action,
+  secondaryAction,
+  variant = "default",
+  className,
 }: {
+  icon?: LucideIcon;
   title: string;
   hint?: string;
+  description?: string;
   action?: React.ReactNode;
+  secondaryAction?: React.ReactNode;
+  variant?: "default" | "no-results";
+  className?: string;
 }) {
+  const body = description ?? hint;
+  const FallbackIcon = variant === "no-results" ? SearchX : undefined;
+  const Glyph = Icon ?? FallbackIcon;
   return (
-    <div className="rounded-xl border border-dashed p-10 text-center">
-      <p className="text-sm font-medium text-foreground/80">{title}</p>
-      {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
-    </div>
+    <Empty className={cn("border bg-card/30 p-10", className)}>
+      <EmptyHeader>
+        {Glyph && (
+          <EmptyMedia variant="icon" className="size-10 [&_svg:not([class*='size-'])]:size-5">
+            <Glyph />
+          </EmptyMedia>
+        )}
+        <EmptyTitle>{title}</EmptyTitle>
+        {body && <EmptyDescription>{body}</EmptyDescription>}
+      </EmptyHeader>
+      {(action || secondaryAction) && (
+        <EmptyContent>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {action}
+            {secondaryAction}
+          </div>
+        </EmptyContent>
+      )}
+    </Empty>
   );
 }
 

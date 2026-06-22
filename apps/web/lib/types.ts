@@ -27,6 +27,12 @@ export const FORUM_LABELS: Record<ForumType, string> = {
 export const MATTER_STATUSES = ["active", "on_hold", "disposed"] as const;
 export type MatterStatus = (typeof MATTER_STATUSES)[number];
 
+export const MATTER_STATUS_LABELS: Record<MatterStatus, string> = {
+  active: "Active",
+  on_hold: "On hold",
+  disposed: "Disposed",
+};
+
 export type LifecycleState =
   | "pending_first_sync"
   | "active"

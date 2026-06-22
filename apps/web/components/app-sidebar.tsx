@@ -2,19 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Home,
-  CalendarDays,
-  Scale,
-  Inbox,
-  ListTodo,
-  Users,
-  Settings,
-  ChevronsUpDown,
-  LogOut,
-} from "lucide-react";
+import { ChevronsUpDown, LogOut } from "lucide-react";
 import { Wordmark } from "@/components/wordmark";
 import { logout } from "@/app/login/actions";
+import { NAV_SECTIONS, FOOTER_ITEMS, isActivePath, type NavCountKey } from "@/lib/nav";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -28,31 +19,32 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuBadge,
 } from "@/components/ui/sidebar";
 
-const NAV = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/matters", label: "Matters", icon: Scale },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/settings", label: "Settings", icon: Settings },
-] as const;
-
 export function AppSidebar({
   email,
   inboxCount = 0,
+  tasksDueToday = 0,
+  hearingsToday = 0,
 }: {
   email?: string | null;
   inboxCount?: number;
+  tasksDueToday?: number;
+  hearingsToday?: number;
 }) {
   const pathname = usePathname();
   const initials = (email ?? "?").slice(0, 2).toUpperCase();
+  const counts: Record<NavCountKey, number> = {
+    inbox: inboxCount,
+    tasksDueToday,
+    hearingsToday,
+  };
 
   return (
     <Sidebar>
@@ -61,27 +53,45 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        <SidebarGroup>
-          <SidebarMenu>
-            {NAV.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(href + "/");
-              return (
-                <SidebarMenuItem key={href}>
-                  <SidebarMenuButton isActive={active} tooltip={label} render={<Link href={href} />}>
-                    <Icon />
-                    <span>{label}</span>
-                  </SidebarMenuButton>
-                  {href === "/inbox" && inboxCount > 0 && (
-                    <SidebarMenuBadge>{inboxCount}</SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
+        {NAV_SECTIONS.map((section) => (
+          <SidebarGroup key={section.label}>
+            <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map(({ href, label, icon: Icon, count }) => {
+                  const active = isActivePath(pathname, href);
+                  const n = count ? counts[count] : 0;
+                  return (
+                    <SidebarMenuItem key={href}>
+                      <SidebarMenuButton isActive={active} tooltip={label} render={<Link href={href} />}>
+                        <Icon />
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                      {n > 0 && <SidebarMenuBadge>{n}</SidebarMenuBadge>}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="p-2">
+        <SidebarMenu>
+          {FOOTER_ITEMS.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <SidebarMenuButton
+                isActive={isActivePath(pathname, item.href)}
+                tooltip={item.label}
+                render={<Link href={item.href} />}
+              >
+                <item.icon />
+                <span>{item.label}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
         <form action={logout} id="signout-form" className="hidden" />
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -99,10 +109,6 @@ export function AppSidebar({
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-52">
-            <DropdownMenuItem render={<Link href="/settings" />}>
-              <Settings className="size-4" />
-              Settings
-            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
                 (document.getElementById("signout-form") as HTMLFormElement | null)?.requestSubmit()

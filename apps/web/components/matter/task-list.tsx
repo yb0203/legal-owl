@@ -2,16 +2,12 @@
 
 import { useTransition } from "react";
 import { Circle, CircleCheck, Plus } from "lucide-react";
-import { PRIORITIES, PRIORITY_LABELS, type WorkflowState } from "@/lib/types";
+import { PRIORITIES, PRIORITY_LABELS, type ActionPriority, type WorkflowState } from "@/lib/types";
 import { DueDateBadge } from "@/components/badges";
+import { TaskPriorityMenu, TaskStatusMenu } from "@/components/status-control";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  createTask,
-  toggleTask,
-  updateTaskPriority,
-  updateTaskState,
-} from "@/app/(app)/matters/[id]/actions";
+import { createTask, toggleTask } from "@/app/(app)/matters/[id]/actions";
 
 export interface TaskRow {
   id: string;
@@ -64,32 +60,14 @@ export function TaskList({
                 {t.title}
               </span>
               {t.due_date && <DueDateBadge date={t.due_date} />}
-              <select
-                aria-label="Priority"
-                className={selectCls}
-                defaultValue={t.priority}
-                disabled={pending}
-                onChange={(e) => start(() => updateTaskPriority(t.id, e.target.value))}
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORITY_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Status"
-                className={selectCls}
-                defaultValue={t.state_id}
-                disabled={pending}
-                onChange={(e) => start(() => updateTaskState(t.id, e.target.value))}
-              >
-                {states.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <TaskPriorityMenu taskId={t.id} current={t.priority as ActionPriority} />
+              <TaskStatusMenu
+                taskId={t.id}
+                states={states}
+                currentStateId={t.state_id}
+                currentType={t.state?.type ?? "unstarted"}
+                currentName={t.state?.name}
+              />
             </li>
           );
         })}

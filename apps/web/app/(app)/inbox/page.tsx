@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { HelpLink } from "@/components/help/help-link";
 import { TriageRow, type TriageRowItem } from "@/components/inbox/triage-row";
 
 interface Row {
@@ -39,7 +40,9 @@ export default async function InboxPage() {
       <PageHeader
         title="Inbox"
         subtitle="Court updates waiting for your review — accept into a task, snooze, or dismiss."
-      />
+      >
+        <HelpLink anchor="triage" label="Inbox" />
+      </PageHeader>
       {items.length === 0 ? (
         <EmptyState title="Inbox zero" hint="You're all caught up — nothing to review." />
       ) : (

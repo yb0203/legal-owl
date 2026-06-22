@@ -2,12 +2,25 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { toast } from "sonner";
+import { Clock, ChevronDown } from "lucide-react";
 import { PRIORITIES, PRIORITY_LABELS } from "@/lib/types";
-import { acceptTriageItem, dismissTriageItem, snoozeTriageItem } from "@/app/(app)/inbox/actions";
+import {
+  acceptTriageItem,
+  dismissTriageItem,
+  reopenTriageItem,
+  snoozeTriageItem,
+} from "@/app/(app)/inbox/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -27,9 +40,58 @@ export interface TriageRowItem {
   matter: { id: string; title: string; key: string } | null;
 }
 
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString();
+}
+
 export function TriageRow({ item }: { item: TriageRowItem }) {
   const [open, setOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customDate, setCustomDate] = useState("");
   const [pending, start] = useTransition();
+
+  const undoToast = (label: string) =>
+    toast(label, {
+      action: {
+        label: "Undo",
+        onClick: () =>
+          start(async () => {
+            try {
+              await reopenTriageItem(item.id);
+            } catch {
+              toast.error("Couldn't undo — please refresh.");
+            }
+          }),
+      },
+    });
+
+  const snooze = (untilIso?: string, label = "Snoozed") =>
+    start(async () => {
+      try {
+        await snoozeTriageItem(item.id, untilIso);
+        undoToast(label);
+      } catch {
+        toast.error("Couldn't snooze — please try again.");
+      }
+    });
+
+  const dismiss = () =>
+    start(async () => {
+      try {
+        await dismissTriageItem(item.id);
+        undoToast("Dismissed");
+      } catch {
+        toast.error("Couldn't dismiss — please try again.");
+      }
+    });
+
+  const applyCustom = () => {
+    if (!customDate) return;
+    setCustomOpen(false);
+    snooze(new Date(customDate).toISOString(), "Snoozed");
+  };
 
   return (
     <li className="rounded-xl border bg-card p-4">
@@ -45,30 +107,49 @@ export function TriageRow({ item }: { item: TriageRowItem }) {
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" disabled={pending} onClick={() => setOpen(true)}>
           Accept as task
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          onClick={() => start(() => snoozeTriageItem(item.id))}
-        >
-          <Clock className="size-3.5" />
-          Snooze
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={pending}
-          onClick={() => start(() => dismissTriageItem(item.id))}
-        >
+
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" disabled={pending} />}>
+            <Clock className="size-3.5" />
+            Snooze
+            <ChevronDown className="size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-52">
+            <DropdownMenuItem onClick={() => snooze(undefined, "Snoozed till before next hearing")}>
+              Until before next hearing
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => snooze(isoInDays(1))}>Tomorrow</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => snooze(isoInDays(7))}>Next week</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setCustomOpen(true)}>Pick a date…</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={dismiss}>
           Dismiss
         </Button>
       </div>
+
+      {customOpen && (
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            type="date"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            className="h-9 w-40"
+          />
+          <Button type="button" size="sm" disabled={pending || !customDate} onClick={applyCustom}>
+            Snooze until
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setCustomOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
