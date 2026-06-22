@@ -205,7 +205,9 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
     },
     {
       label: "Next hearing",
-      value: <HearingPill date={matter.next_hearing_date} />,
+      // Pass null when there's no hearing so the rail's own em-dash renders,
+      // matching every other attribute's empty state.
+      value: matter.next_hearing_date ? <HearingPill date={matter.next_hearing_date} /> : null,
       hint: <RuleHint>Computed from the earliest scheduled hearing</RuleHint>,
     },
     {

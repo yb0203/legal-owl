@@ -178,11 +178,13 @@ export default async function TasksPage({
       {tasks.length === 0 ? (
         <EmptyState
           icon={ListTodo}
-          title={filter === "overdue" ? "Nothing overdue" : "No tasks here"}
+          title={label ? "No tasks with this label" : filter === "overdue" ? "Nothing overdue" : "No tasks here"}
           description={
-            filter === "overdue"
-              ? "You're on top of your deadlines — nothing is past due."
-              : "Add one above, create a task on a matter, or accept an item from the Inbox."
+            label
+              ? "No tasks in this view carry the selected label — clear the label filter to see the rest."
+              : filter === "overdue"
+                ? "You're on top of your deadlines — nothing is past due."
+                : "Add one above, create a task on a matter, or accept an item from the Inbox."
           }
           action={
             matterOptions.length === 0 ? (
