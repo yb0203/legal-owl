@@ -73,8 +73,38 @@ prototype/
   ecourts-streamlit/         # Streamlit prototype of the eCourts integration
 ```
 
+## Running the web app
+
+The product lives in [`apps/web`](./apps/web) (Next.js App Router). From that directory:
+
+```bash
+npm install
+npm run dev        # local dev (Turbopack)
+npm run build      # production build — typecheck + routes (the green-build gate)
+npm run lint       # ESLint
+```
+
+Environment: copy the Supabase + Resend keys into `apps/web/.env.local` (and root `.env` for the
+DB password); these are gitignored. Database schema is in [`supabase/migrations/`](./supabase/migrations)
+— apply with `supabase db push --db-url "$DBURL"` (Mumbai session pooler).
+
 ## Status
 
-Pre-production. The architecture is finalized (`docs/ARCHITECTURE.md`); the production app
-(Next.js + Supabase) is being built foundation-first: Case Workflow (system of record) →
-Model + Lawyer Assist → Client Notifs.
+The production app (Next.js + Supabase, deployed on Vercel) is built foundation-first. **Shipped:**
+
+- **App shell** — responsive sidebar + header, ⌘K command palette, global "New" menu, off-dark theme.
+- **Case management (the foundation)** — Clients → Engagements → Matters → Actions. Client intake
+  with an advisory conflict check; the **Matter** case file (pinned header, editable details,
+  parties, unified timeline of court events + remarks, Tasks, Hearings + outcomes, Deadlines,
+  Documents).
+- **Workflow** — cross-matter **Tasks** (filters, inline edit) and an **Inbox** (court-update triage:
+  accept-as-task with priority/due, snooze-to-day-before-hearing, dismiss).
+- **Calendar** — agenda of upcoming hearings + deadlines across all matters.
+- **Documents** — per-matter upload to a private Supabase Storage bucket (signed-URL download).
+- **Auth** — email/password with a waitlist `has_access` gate. RLS per `lawyer_id` throughout.
+- **Onboarding** — a "See it in action" toggle that seeds/clears realistic demo data.
+
+**Not yet built (deferred per strategy):** live eCourts sync (court events are currently
+demo-seeded), the AI layer (Model + Lawyer Assist), and the client-facing Client Notifs portal.
+
+See [`CLAUDE.md`](./CLAUDE.md) for build commands, conventions, and architecture notes for the app.
