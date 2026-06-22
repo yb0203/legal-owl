@@ -157,6 +157,77 @@ export async function updateTaskPriority(taskId: string, priority: string) {
   revalidatePath("/", "layout");
 }
 
+// ── Task dependencies (action_relations) ─────────────────────────────────────
+// A single canonical row per relation; the inverse direction is computed at read
+// time. Relations are scoped to tasks within the same matter (no cross-matter).
+export type TaskRelationRow = {
+  id: string;
+  action_id: string;
+  related_id: string;
+  kind: "blocks" | "blocked_by" | "related";
+};
+
+export async function loadTaskRelations(matterId: string): Promise<TaskRelationRow[]> {
+  if (!matterId) return [];
+  const { supabase, user } = await authed();
+  if (!user) return [];
+  // Tasks belonging to this matter (RLS already scopes to the lawyer).
+  const { data: tasks } = await supabase.from("actions").select("id").eq("matter_id", matterId);
+  const ids = (tasks ?? []).map((t) => t.id);
+  if (ids.length === 0) return [];
+  const { data } = await supabase
+    .from("action_relations")
+    .select("id, action_id, related_id, kind")
+    .in("action_id", ids)
+    .returns<TaskRelationRow[]>();
+  return data ?? [];
+}
+
+export async function addTaskRelation(formData: FormData) {
+  const matterId = String(formData.get("matter_id"));
+  const actionId = String(formData.get("action_id"));
+  const relatedId = String(formData.get("related_id"));
+  const kind = String(formData.get("kind") || "");
+  if (!matterId || !actionId || !relatedId || !kind) return;
+  if (actionId === relatedId) return; // a task cannot relate to itself
+  if (kind !== "blocks" && kind !== "blocked_by" && kind !== "related") return;
+  const { supabase, user } = await authed();
+  if (!user) return;
+
+  // Both tasks must live in this matter (no cross-matter linking in this slice).
+  const { data: scoped } = await supabase
+    .from("actions")
+    .select("id")
+    .eq("matter_id", matterId)
+    .in("id", [actionId, relatedId]);
+  if ((scoped ?? []).length !== 2) return;
+
+  // Prevent duplicate (action_id, related_id, kind).
+  const { data: existing } = await supabase
+    .from("action_relations")
+    .select("id")
+    .eq("action_id", actionId)
+    .eq("related_id", relatedId)
+    .eq("kind", kind)
+    .limit(1);
+  if ((existing ?? []).length > 0) return;
+
+  await supabase
+    .from("action_relations")
+    .insert({ lawyer_id: user.id, action_id: actionId, related_id: relatedId, kind });
+  revalidatePath(`/matters/${matterId}`);
+}
+
+export async function removeTaskRelation(formData: FormData) {
+  const matterId = String(formData.get("matter_id"));
+  const relationId = String(formData.get("relation_id"));
+  if (!relationId) return;
+  const { supabase, user } = await authed();
+  if (!user) return;
+  await supabase.from("action_relations").delete().eq("id", relationId);
+  if (matterId) revalidatePath(`/matters/${matterId}`);
+}
+
 export async function addHearing(formData: FormData) {
   const matterId = String(formData.get("matter_id"));
   const date = String(formData.get("hearing_date") || "");
