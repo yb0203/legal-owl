@@ -4,13 +4,17 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   FORUM_LABELS,
+  FORUM_TYPES,
+  MATTER_STATUSES,
+  MATTER_STATUS_LABELS,
   type ForumType,
+  type LifecycleState,
   type MatterStatus,
   type Parties,
   type WorkflowState,
 } from "@/lib/types";
 import { fmtDate, fmtDateYear } from "@/lib/format";
-import { ForumBadge, HearingPill, SourceChip } from "@/components/badges";
+import { ForumBadge, HearingPill, MatterStatusBadge, SourceChip } from "@/components/badges";
 import { EmptyState } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +25,9 @@ import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
 import { CopyChip } from "@/components/matter/copy-chip";
 import { ConfirmDeleteDocument } from "@/components/matter/confirm-delete-document";
 import { TaskList, type TaskRow } from "@/components/matter/task-list";
+import { PropertiesRail, type PropertyRow } from "@/components/record/properties-rail";
+import { RuleHint } from "@/components/record/rule-hint";
+import { AttributeValue } from "@/components/record/attribute-value";
 import {
   addRemark,
   addHearing,
@@ -45,6 +52,14 @@ const DEADLINE_LABELS: Record<string, string> = {
   internal: "Internal",
 };
 
+const LIFECYCLE_LABELS: Record<LifecycleState, string> = {
+  pending_first_sync: "Pending first sync",
+  active: "Active",
+  not_found: "Not found",
+  disposed: "Disposed",
+};
+const LIFECYCLE_STATES = Object.keys(LIFECYCLE_LABELS) as LifecycleState[];
+
 interface MatterDetail {
   id: string;
   key: string;
@@ -55,6 +70,8 @@ interface MatterDetail {
   case_type: string | null;
   court_status: string | null;
   matter_status: MatterStatus;
+  lifecycle_state: LifecycleState;
+  last_successful_sync_at: string | null;
   next_hearing_date: string | null;
   archived_at: string | null;
   client: { id: string; display_name: string } | null;
@@ -68,7 +85,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const { data: matterRow } = await supabase
     .from("matters")
     .select(
-      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, next_hearing_date, archived_at, client:clients(id, display_name), engagement:engagements(id, name)",
+      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, client:clients(id, display_name), engagement:engagements(id, name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -113,64 +130,105 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   ].sort((a, b) => (a.at < b.at ? 1 : -1));
 
   const parties = matter.parties ?? {};
+  const petitioners = parties.petitioners ?? [];
+  const respondents = parties.respondents ?? [];
   const openTasks = (tasks ?? []).filter((t) => !t.completed_at).length;
 
+  const partiesValue =
+    petitioners.length || respondents.length ? (
+      <span>
+        {petitioners.join(", ") || "—"} <span className="text-muted-foreground/60">v.</span>{" "}
+        {respondents.join(", ") || "—"}
+      </span>
+    ) : null;
+
+  // Every stored matter attribute, surfaced in the facts rail (AE1).
+  const factRows: PropertyRow[] = [
+    {
+      label: "Matter id",
+      value: <CopyChip value={matter.key} label="Matter id" />,
+    },
+    {
+      label: "CNR",
+      value: matter.cnr ? <CopyChip value={matter.cnr} label="CNR" /> : null,
+    },
+    {
+      label: "Forum",
+      value: <AttributeValue value={<ForumBadge forum={matter.forum_type} />} domain={FORUM_TYPES.map((f) => FORUM_LABELS[f])} />,
+    },
+    { label: "Case type", value: matter.case_type },
+    { label: "Parties", value: partiesValue },
+    {
+      label: "Status",
+      value: <AttributeValue value={<MatterStatusBadge status={matter.matter_status} />} domain={MATTER_STATUSES.map((s) => MATTER_STATUS_LABELS[s])} />,
+    },
+    {
+      label: "Lifecycle",
+      value: <AttributeValue value={LIFECYCLE_LABELS[matter.lifecycle_state]} domain={LIFECYCLE_STATES.map((s) => LIFECYCLE_LABELS[s])} />,
+      hint: <RuleHint>Court-sync state (read-only)</RuleHint>,
+    },
+    {
+      label: "Last synced",
+      value: matter.last_successful_sync_at ? <span className="tnum">{fmtDateYear(matter.last_successful_sync_at)}</span> : null,
+    },
+    {
+      label: "Client",
+      value: matter.client ? (
+        <Link href={`/clients/${matter.client.id}`} className="text-foreground hover:underline">
+          {matter.client.display_name}
+          {matter.engagement && matter.engagement.name !== "General" ? ` · ${matter.engagement.name}` : ""}
+        </Link>
+      ) : null,
+    },
+    {
+      label: "Next hearing",
+      value: <HearingPill date={matter.next_hearing_date} />,
+      hint: <RuleHint>Computed from the earliest scheduled hearing</RuleHint>,
+    },
+    {
+      label: "Activity",
+      value: (
+        <span className="tnum text-muted-foreground">
+          {hearings?.length ?? 0} hearings · {deadlines?.length ?? 0} deadlines · {documents?.length ?? 0} documents · {openTasks} open task{openTasks === 1 ? "" : "s"}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <main className="mx-auto w-full max-w-6xl p-6 sm:p-8">
       <Link href="/matters" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="size-4" /> Matters
       </Link>
 
-      {/* Pinned case header */}
-      <header className="mt-3 rounded-xl border bg-card p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-serif text-2xl font-semibold tracking-tight">{matter.title}</h1>
-            {(parties.petitioners?.length || parties.respondents?.length) && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {(parties.petitioners ?? []).join(", ")}{" "}
-                <span className="text-muted-foreground/60">v.</span>{" "}
-                {(parties.respondents ?? []).join(", ")}
-              </p>
-            )}
-          </div>
-          <EditDetailsDialog
-            matter={{
-              id: matter.id,
-              title: matter.title,
-              case_type: matter.case_type,
-              forum_type: matter.forum_type,
-              cnr: matter.cnr,
-              parties,
-            }}
-          />
-        </div>
+      <div className="mt-3 grid gap-6 lg:grid-cols-[20rem_1fr]">
+        {/* Facts / properties rail — the matter as one legible object. */}
+        <aside className="lg:sticky lg:top-6 lg:self-start">
+          <div className="rounded-xl border bg-card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="min-w-0 font-serif text-xl font-semibold tracking-tight">{matter.title}</h1>
+              <EditDetailsDialog
+                matter={{
+                  id: matter.id,
+                  title: matter.title,
+                  case_type: matter.case_type,
+                  forum_type: matter.forum_type,
+                  cnr: matter.cnr,
+                  parties,
+                }}
+              />
+            </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <ForumBadge forum={matter.forum_type} />
-          {matter.case_type && <span className="text-muted-foreground">{matter.case_type}</span>}
-          <CopyChip value={matter.key} label="Matter id" />
-          {matter.cnr && <CopyChip value={matter.cnr} label="CNR" />}
-          {matter.client && (
-            <Link href={`/clients/${matter.client.id}`} className="text-muted-foreground hover:text-foreground">
-              {matter.client.display_name}
-              {matter.engagement && matter.engagement.name !== "General" ? ` · ${matter.engagement.name}` : ""}
-            </Link>
-          )}
-        </div>
+            <PropertiesRail items={factRows} className="mt-3" />
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <div>
-            <div className="text-xs text-muted-foreground">Next hearing</div>
-            <div className="mt-0.5">
-              <HearingPill date={matter.next_hearing_date} />
+            <div className="mt-4 border-t pt-4">
+              <div className="mb-2 text-xs text-muted-foreground">Actions</div>
+              <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
             </div>
           </div>
-          <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
-        </div>
-      </header>
+        </aside>
 
-      <Tabs defaultValue="timeline" className="mt-6">
+      <Tabs defaultValue="timeline" className="min-w-0">
         <TabsList>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="tasks">Tasks {openTasks > 0 && <span className="tnum ml-1 text-muted-foreground">{openTasks}</span>}</TabsTrigger>
@@ -181,6 +239,9 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
         {/* Timeline */}
         <TabsContent value="timeline" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <RuleHint>Append-only — court events &amp; remarks are never edited or deleted</RuleHint>
+          </div>
           <form action={addRemark} className="flex items-end gap-2">
             <input type="hidden" name="matter_id" value={id} />
             <Textarea name="body" rows={1} required placeholder="Add a remark…" className="min-h-10 resize-none" />
@@ -321,6 +382,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
           )}
         </TabsContent>
       </Tabs>
+      </div>
     </main>
   );
 }
