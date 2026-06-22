@@ -211,3 +211,9 @@ export interface DocumentRow {
   source: DocumentSource;
   uploaded_at: string;
 }
+
+export interface Label {
+  id: string;
+  name: string;
+  color: string | null;
+}

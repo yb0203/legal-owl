@@ -6,7 +6,7 @@ import { PageHeader, EmptyState } from "@/components/page-header";
 import { TasksList, TaskRow, type CrossTask } from "@/components/tasks-list";
 import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
-import { PRIORITIES, PRIORITY_LABELS } from "@/lib/types";
+import { PRIORITIES, PRIORITY_LABELS, type Label } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -25,13 +25,13 @@ const selectCls =
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; label?: string }>;
 }) {
-  const { filter = "open" } = await searchParams;
+  const { filter = "open", label = "" } = await searchParams;
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: rows }, states, { data: matters }] = await Promise.all([
+  const [{ data: rows }, states, { data: matters }, { data: labelRows }, { data: assignmentRows }] = await Promise.all([
     supabase
       .from("actions")
       .select(
@@ -46,9 +46,18 @@ export default async function TasksPage({
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .returns<{ id: string; title: string }[]>(),
+    supabase.from("labels").select("id, name, color").order("name").returns<Label[]>(),
+    supabase.from("action_labels").select("action_id, label_id").returns<{ action_id: string; label_id: string }[]>(),
   ]);
 
-  const all = rows ?? [];
+  const labels = labelRows ?? [];
+  const labelById = new Map(labels.map((l) => [l.id, l]));
+  const labelsByTask: Record<string, Label[]> = {};
+  for (const a of assignmentRows ?? []) {
+    const l = labelById.get(a.label_id);
+    if (l) (labelsByTask[a.action_id] ??= []).push(l);
+  }
+  const all = (rows ?? []).map((t) => ({ ...t, labels: labelsByTask[t.id] ?? [] }));
   const isDone = (t: CrossTask) => !!t.completed_at;
   const open = all.filter((t) => !isDone(t));
   const counts = {
@@ -63,6 +72,7 @@ export default async function TasksPage({
   else if (filter === "done") tasks = all.filter(isDone);
   else if (filter === "overdue")
     tasks = all.filter((t) => !isDone(t) && t.due_date && t.due_date < today);
+  if (label) tasks = tasks.filter((t) => t.labels.some((l) => l.id === label));
 
   // The default Open view groups by time-horizon; other views stay flat.
   const grouped = filter === "open";
@@ -117,10 +127,15 @@ export default async function TasksPage({
       <div className="mb-4 flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {
           const active = filter === f.value;
+          const sp = new URLSearchParams({
+            ...(f.value !== "open" ? { filter: f.value } : {}),
+            ...(label ? { label } : {}),
+          });
+          const href = sp.toString() ? `/tasks?${sp}` : "/tasks";
           return (
             <Link
               key={f.value}
-              href={f.value === "open" ? "/tasks" : `/tasks?filter=${f.value}`}
+              href={href}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 active ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/40",
@@ -134,6 +149,31 @@ export default async function TasksPage({
           );
         })}
       </div>
+
+      {labels.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {labels.map((l) => {
+            const active = label === l.id;
+            const sp = new URLSearchParams({
+              ...(filter !== "open" ? { filter } : {}),
+              ...(active ? {} : { label: l.id }),
+            });
+            return (
+              <Link
+                key={l.id}
+                href={sp.toString() ? `/tasks?${sp}` : "/tasks"}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+                  active ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/40",
+                )}
+              >
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: l.color ?? "var(--muted-foreground)" }} />
+                {l.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       {tasks.length === 0 ? (
         <EmptyState

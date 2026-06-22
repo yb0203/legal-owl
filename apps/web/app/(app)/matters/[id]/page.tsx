@@ -28,6 +28,9 @@ import { TaskList, type TaskRow } from "@/components/matter/task-list";
 import { PropertiesRail, type PropertyRow } from "@/components/record/properties-rail";
 import { RuleHint } from "@/components/record/rule-hint";
 import { AttributeValue } from "@/components/record/attribute-value";
+import { LabelPicker } from "@/components/label-picker";
+import { loadLabels } from "@/app/(app)/labels/actions";
+import type { Label } from "@/lib/types";
 import {
   addRemark,
   addHearing,
@@ -100,6 +103,8 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
     { data: deadlines },
     { data: documents },
     { data: states },
+    { data: matterLabels },
+    allLabels,
   ] = await Promise.all([
     supabase.from("court_events").select("id, event_type, new_value, occurred_at, detected_at, source_type").eq("matter_id", id),
     supabase.from("remarks").select("id, body, created_at").eq("matter_id", id),
@@ -108,7 +113,25 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
     supabase.from("deadlines").select("id, type, due_date, basis").eq("matter_id", id).order("due_date", { ascending: true }),
     supabase.from("documents").select("id, name, source, uploaded_at, storage_path").eq("matter_id", id).order("uploaded_at", { ascending: false }),
     supabase.from("workflow_states").select("id, name, type, position").is("lawyer_id", null).order("position").returns<WorkflowState[]>(),
+    supabase.from("matter_labels").select("label:labels(id, name, color)").eq("matter_id", id).returns<{ label: Label | null }[]>(),
+    loadLabels(),
   ]);
+
+  const matterLabelList: Label[] = (matterLabels ?? []).map((r) => r.label).filter((l): l is Label => !!l);
+
+  // Per-task label assignments, for chips + filtering on the Tasks tab.
+  const taskIds = (tasks ?? []).map((t) => t.id);
+  const { data: taskLabelRows } = taskIds.length
+    ? await supabase
+        .from("action_labels")
+        .select("action_id, label:labels(id, name, color)")
+        .in("action_id", taskIds)
+        .returns<{ action_id: string; label: Label | null }[]>()
+    : { data: [] as { action_id: string; label: Label | null }[] };
+  const taskLabels: Record<string, Label[]> = {};
+  for (const r of taskLabelRows ?? []) {
+    if (r.label) (taskLabels[r.action_id] ??= []).push(r.label);
+  }
 
   type TL = { kind: "event" | "remark"; key: string; at: string; label: string; source: "ecourt" | "lawyer_manual" | "system"; body?: string };
   const timeline: TL[] = [
@@ -193,6 +216,10 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
         </span>
       ),
     },
+    {
+      label: "Labels",
+      value: <LabelPicker kind="matter" entityId={matter.id} assigned={matterLabelList} available={allLabels} />,
+    },
   ];
 
   return (
@@ -271,7 +298,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
         {/* Tasks */}
         <TabsContent value="tasks" className="mt-4">
-          <TaskList matterId={id} tasks={tasks ?? []} states={states ?? []} />
+          <TaskList matterId={id} tasks={tasks ?? []} states={states ?? []} taskLabels={taskLabels} allLabels={allLabels} />
         </TabsContent>
 
         {/* Hearings */}

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Circle, CircleCheck, Link2, Lock, Plus, X } from "lucide-react";
-import { PRIORITIES, PRIORITY_LABELS, type ActionPriority, type WorkflowState } from "@/lib/types";
+import { PRIORITIES, PRIORITY_LABELS, type ActionPriority, type Label, type WorkflowState } from "@/lib/types";
 import { DueDateBadge } from "@/components/badges";
 import { TaskPriorityMenu, TaskStatusMenu } from "@/components/status-control";
+import { LabelPicker } from "@/components/label-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -57,10 +58,14 @@ export function TaskList({
   matterId,
   tasks,
   states,
+  taskLabels = {},
+  allLabels = [],
 }: {
   matterId: string;
   tasks: TaskRow[];
   states: WorkflowState[];
+  taskLabels?: Record<string, Label[]>;
+  allLabels?: Label[];
 }) {
   const [pending, start] = useTransition();
   const [relations, setRelations] = useState<TaskRelationRow[]>([]);
@@ -236,6 +241,15 @@ export function TaskList({
                   ))}
                 </div>
               )}
+
+              <div className="mt-1 ml-8">
+                <LabelPicker
+                  kind="task"
+                  entityId={t.id}
+                  assigned={taskLabels[t.id] ?? []}
+                  available={allLabels}
+                />
+              </div>
             </li>
           );
         })}
