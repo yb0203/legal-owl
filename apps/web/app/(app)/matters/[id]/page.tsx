@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatterStatusControl } from "@/components/matter/matter-status";
+import { SyncNowButton } from "@/components/matter/sync-now-button";
 import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
 import { CopyChip } from "@/components/matter/copy-chip";
 import { ConfirmDeleteDocument } from "@/components/matter/confirm-delete-document";
@@ -252,7 +253,10 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
             <div className="mt-4 border-t pt-4">
               <div className="mb-2 text-xs text-muted-foreground">Actions</div>
-              <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
+              <div className="flex flex-wrap items-center gap-2">
+                <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
+                <SyncNowButton matterId={matter.id} hasCnr={!!matter.cnr} />
+              </div>
             </div>
           </Panel>
         </aside>

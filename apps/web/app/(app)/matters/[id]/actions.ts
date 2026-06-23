@@ -4,6 +4,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nextKey } from "@/lib/db";
+import { syncOneMatter, type RunResult } from "@/lib/ecourts/run";
+
+// "Sync now" — fetch the matter's CNR from eCourts and diff into its timeline.
+export async function syncMatterNow(matterId: string): Promise<RunResult> {
+  const { supabase, user } = await authed();
+  if (!user) return { ok: false, reason: "unauthorized" };
+  const { data: m } = await supabase
+    .from("matters")
+    .select("id, lawyer_id, cnr, court_status, next_hearing_date")
+    .eq("id", matterId)
+    .maybeSingle();
+  if (!m) return { ok: false, reason: "error" };
+  const r = await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1]);
+  revalidatePath(`/matters/${matterId}`);
+  return r;
+}
 
 async function authed() {
   const supabase = await createClient();
