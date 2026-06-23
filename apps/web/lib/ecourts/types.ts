@@ -38,6 +38,7 @@ export interface RawCaseData {
   stateCode?: string;
   historyOfCaseHearings?: RawHearing[];
   judgmentOrders?: RawOrder[];
+  interimOrders?: RawOrder[];
 }
 
 /** Result of a client call — never throws on "not found"; callers branch on `ok`. */

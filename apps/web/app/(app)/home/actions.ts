@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureGeneralEngagement } from "@/lib/db";
+import { getCase, getEnums } from "@/lib/ecourts/client";
+import { normalizeCase } from "@/lib/ecourts/normalize";
+import { syncMatter } from "@/lib/ecourts/sync";
 
 const DEMO_CLIENT_TAG = "Sample data — added by “See it in action”.";
 // Demo labels are shared with the real `labels` table, so they're cleared by
@@ -316,6 +319,39 @@ export async function seedSampleData() {
     .map(({ key, label_id }) => ({ lawyer_id, action_id: actionId(key), label_id }))
     .filter((r): r is { lawyer_id: string; action_id: string; label_id: string } => !!r.action_id && !!r.label_id);
   if (actionLabels.length) await supabase.from("action_labels").insert(actionLabels);
+
+  // ── A genuinely live eCourts case (demo D2) ───────────────────────────────
+  // Seed one matter backed by a real, public CNR and sync it for real, so the
+  // demo shows an authentic eCourts connection — not a fabricated timeline.
+  // Best-effort + key-gated; if the key/credits are absent the demo just omits it.
+  if (process.env.ECOURTS_API_KEY) {
+    const REAL_CNR = "MPHC030045132023"; // real, public, pending High Court case
+    try {
+      const res = await getCase(REAL_CNR);
+      if (res.ok) {
+        const n = normalizeCase(res.data, await getEnums());
+        const title =
+          [n.petitioners[0], n.respondents[0]].filter(Boolean).join(" vs ") || "Live eCourts case";
+        const mReal = await addMatter({
+          key: "DEMO-7",
+          cnr: REAL_CNR,
+          forum_type: n.forum_type ?? "high_court",
+          case_type: n.case_type,
+          title,
+          parties: { petitioners: n.petitioners, respondents: n.respondents },
+          court_status: n.court_status,
+          matter_status: "active",
+          lifecycle_state: "active",
+          next_hearing_date: n.next_hearing_date,
+          client_id: cMbecl,
+          engagement_id: eMbecl,
+        });
+        await syncMatter(supabase, { id: mReal, lawyer_id, court_status: null, next_hearing_date: null }, n);
+      }
+    } catch {
+      /* live sync is best-effort — the rest of the demo stands without it */
+    }
+  }
 
   revalidatePath("/", "layout");
   redirect("/home");

@@ -8,20 +8,20 @@ function describe(list: EnumOption[] | undefined, code: string | undefined): str
   return hit?.description ?? code;
 }
 
-// Map the API's courtType (string) to the app's ForumType. Heuristic by keyword
-// (the API has ~20 court types); pending tightening against real data (plan U1).
-function toForum(courtType: string | null): ForumType | null {
-  if (!courtType) return null;
-  const s = courtType.toLowerCase();
-  if (s.includes("supreme")) return "supreme_court";
-  if (s.includes("high court")) return "high_court";
-  if (s.includes("nclat")) return "nclat";
-  if (s.includes("nclt") || s.includes("national company law")) return "nclt";
-  if (s.includes("arbitr")) return "arbitration";
-  if (s.includes("district") || s.includes("sessions") || s.includes("civil")) return "district";
-  if (s.includes("tribunal") || s.includes("itat") || s.includes("cestat") || s.includes("cat"))
-    return "tribunal";
-  return "other";
+// Map the court to the app's ForumType. Verified against real data (plan U1):
+// `courtType` is often null, so derive from courtName/cnrCourtCode (e.g. "MPHC"
+// → high_court). Forum is only used to prefill a new matter; the sync engine
+// never overwrites the lawyer's chosen forum.
+function toForum(name: string | null): ForumType | null {
+  if (!name) return null;
+  const s = name.toUpperCase();
+  if (/SUPREME|\bSCIN\b/.test(s)) return "supreme_court";
+  if (/NCLAT/.test(s)) return "nclat";
+  if (/NCLT/.test(s)) return "nclt";
+  if (/CESTAT|ITAT|\bCAT\b|\bDRT\b|\bAFT\b|\bNGT\b|TRIBUNAL/.test(s)) return "tribunal";
+  if (/ARBITR/.test(s)) return "arbitration";
+  if (/HC|HIGH COURT/.test(s)) return "high_court";
+  return "district";
 }
 
 // A case is disposed when its status reads as concluded.
@@ -33,19 +33,20 @@ function isDisposed(status: string | null): boolean {
 
 export function normalizeCase(raw: RawCaseData, enums: Enums | null): NormalizedCase {
   const status = describe(enums?.caseStatus, raw.caseStatus);
-  const courtTypeDesc = describe(enums?.courtType, raw.courtType);
-  const forum = toForum(courtTypeDesc);
+  // courtType is frequently null (verified U1) — fall back to court name/code.
+  const forum = toForum(raw.courtName ?? raw.cnrCourtCode ?? describe(enums?.courtType, raw.courtType));
   const disposed = isDisposed(status);
 
   const hearings = (raw.historyOfCaseHearings ?? [])
     .map((h) => ({
-      hearing_date: (h.hearingDate ?? h.businessOnDate ?? "").slice(0, 10),
+      hearing_date: (h.hearingDate ?? "").slice(0, 10),
       purpose: h.purposeOfListing ?? null,
-      outcome: h.businessOnDate ?? null,
+      outcome: null as string | null, // the API hearing history carries no outcome field
     }))
     .filter((h) => h.hearing_date);
 
-  const orders = (raw.judgmentOrders ?? [])
+  // Both interim and judgment orders count as "orders" on the timeline.
+  const orders = [...(raw.judgmentOrders ?? []), ...(raw.interimOrders ?? [])]
     .map((o) => ({ order_date: (o.orderDate ?? "").slice(0, 10), url: o.orderUrl ?? null }))
     .filter((o) => o.order_date);
 

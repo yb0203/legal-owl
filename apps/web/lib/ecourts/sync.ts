@@ -106,8 +106,10 @@ export async function syncMatter(
     }
   }
 
-  // Upsert hearings (idempotent on matter_id+hearing_date+ordinal; updates outcome).
+  // Upsert hearings (idempotent on matter_id+hearing_date+ordinal). The API
+  // history has no outcome field, so derive held/scheduled from the date.
   if (c.hearings.length) {
+    const today = now.slice(0, 10);
     await supabase.from("hearings").upsert(
       c.hearings.map((h) => ({
         lawyer_id,
@@ -116,7 +118,7 @@ export async function syncMatter(
         purpose: h.purpose,
         outcome: h.outcome,
         source: "ecourt",
-        state: h.outcome ? "held" : "scheduled",
+        state: h.hearing_date < today ? "held" : "scheduled",
         ordinal: 0,
       })),
       { onConflict: "matter_id,hearing_date,ordinal", ignoreDuplicates: false },
