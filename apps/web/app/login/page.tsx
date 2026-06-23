@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { login, signup } from "./actions";
+import { requestSignIn } from "./actions";
 import { AuthShell } from "@/components/auth-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
 import { Input } from "@/components/ui/input";
@@ -14,53 +14,34 @@ export default async function LoginPage({
 
   return (
     <AuthShell>
-      <h1 className="font-serif text-2xl font-semibold tracking-tight">Welcome back</h1>
+      <h1 className="font-serif text-2xl font-semibold tracking-tight">Sign in to Legal Owl</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Access is invite-only.{" "}
-        <Link href="/" className="text-foreground underline underline-offset-4">
-          Join the waitlist
-        </Link>
-        .
+        No passwords. Enter your email and we&apos;ll send a one-tap link and a sign-in code.
       </p>
 
       <form className="mt-6 space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required placeholder="you@chambers.in" />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link
-              href="/login/reset"
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <Input id="password" name="password" type="password" required placeholder="Min. 6 characters" />
+          <Input id="email" name="email" type="email" required autoFocus placeholder="you@chambers.in" />
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className="space-y-2 pt-1">
-          <AuthSubmitButton action={login} pendingText="Signing in…" className="w-full">
-            Sign in
-          </AuthSubmitButton>
-          <AuthSubmitButton
-            action={signup}
-            pendingText="Requesting…"
-            variant="outline"
-            className="w-full"
-          >
-            Request access
-          </AuthSubmitButton>
-        </div>
+        <AuthSubmitButton action={requestSignIn} pendingText="Sending…" className="w-full">
+          Email me a sign-in link
+        </AuthSubmitButton>
+
         <p className="text-center text-xs text-muted-foreground">
-          New here? Requesting access adds you to the waitlist — we&apos;ll email you when your account
-          is approved.
+          New here? You&apos;ll join the waitlist — access is invite-only, and we&apos;ll email you
+          when your account is approved.
         </p>
       </form>
+
+      <p className="mt-4 text-sm text-muted-foreground">
+        <Link href="/" className="text-foreground underline underline-offset-4">
+          Back to home
+        </Link>
+      </p>
     </AuthShell>
   );
 }
