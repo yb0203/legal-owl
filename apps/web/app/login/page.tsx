@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { login, signup } from "./actions";
 import { AuthShell } from "@/components/auth-shell";
-import { Button } from "@/components/ui/button";
+import { AuthSubmitButton } from "@/components/auth-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -44,12 +44,17 @@ export default async function LoginPage({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="space-y-2 pt-1">
-          <Button type="submit" formAction={login} className="w-full">
+          <AuthSubmitButton action={login} pendingText="Signing in…" className="w-full">
             Sign in
-          </Button>
-          <Button type="submit" formAction={signup} variant="outline" className="w-full">
+          </AuthSubmitButton>
+          <AuthSubmitButton
+            action={signup}
+            pendingText="Requesting…"
+            variant="outline"
+            className="w-full"
+          >
             Request access
-          </Button>
+          </AuthSubmitButton>
         </div>
         <p className="text-center text-xs text-muted-foreground">
           New here? Requesting access adds you to the waitlist — we&apos;ll email you when your account

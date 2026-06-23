@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requestPasswordReset } from "../actions";
 import { AuthShell } from "@/components/auth-shell";
-import { Button } from "@/components/ui/button";
+import { AuthSubmitButton } from "@/components/auth-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -31,9 +31,13 @@ export default async function ResetPasswordPage({
               <Label htmlFor="email">Email</Label>
               <Input id="email" name="email" type="email" required placeholder="you@chambers.in" />
             </div>
-            <Button type="submit" formAction={requestPasswordReset} className="w-full">
+            <AuthSubmitButton
+              action={requestPasswordReset}
+              pendingText="Sending…"
+              className="w-full"
+            >
               Send reset link
-            </Button>
+            </AuthSubmitButton>
           </form>
         </>
       )}
