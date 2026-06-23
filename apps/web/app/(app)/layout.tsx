@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWaitlistAccess } from "@/lib/auth";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
+import { SampleDataBanner } from "@/components/sample-data-banner";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 // Access gate (auth + has_access) + the app shell: responsive sidebar + content.
@@ -24,6 +25,7 @@ export default async function AppLayout({
     { count: tasksDueToday },
     { count: hearingsToday },
     { data: matters },
+    { count: sampleCount },
   ] = await Promise.all([
     supabase
       .from("triage_items")
@@ -46,6 +48,8 @@ export default async function AppLayout({
       .order("created_at", { ascending: false })
       .limit(50)
       .returns<{ id: string; title: string; key: string }[]>(),
+    // Sample data is identified by the DEMO- matter-key prefix (see seedSampleData).
+    supabase.from("matters").select("id", { count: "exact", head: true }).like("key", "DEMO-%"),
   ]);
 
   return (
@@ -57,6 +61,7 @@ export default async function AppLayout({
         hearingsToday={hearingsToday ?? 0}
       />
       <SidebarInset>
+        {(sampleCount ?? 0) > 0 && <SampleDataBanner />}
         <AppHeader matters={matters ?? []} />
         {children}
       </SidebarInset>
