@@ -29,9 +29,7 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-
-const selectCls =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+import { NativeSelect } from "@/components/native-select";
 
 export interface TriageRowItem {
   id: string;
@@ -168,13 +166,13 @@ export function TriageRow({ item }: { item: TriageRowItem }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor={`pri-${item.id}`}>Priority</Label>
-                <select id={`pri-${item.id}`} name="priority" defaultValue="medium" className={selectCls}>
+                <NativeSelect id={`pri-${item.id}`} name="priority" defaultValue="medium">
                   {PRIORITIES.map((p) => (
                     <option key={p} value={p}>
                       {PRIORITY_LABELS[p]}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={`due-${item.id}`}>Due date</Label>

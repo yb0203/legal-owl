@@ -4,15 +4,13 @@ import { useTransition } from "react";
 import { Archive, ArchiveRestore } from "lucide-react";
 import { MATTER_STATUSES, type MatterStatus } from "@/lib/types";
 import { setMatterStatus, archiveMatter } from "@/app/(app)/matters/[id]/actions";
+import { NativeSelect } from "@/components/native-select";
 
 const LABELS: Record<MatterStatus, string> = {
   active: "Active",
   on_hold: "On hold",
   disposed: "Disposed",
 };
-
-const selectCls =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
 
 export function MatterStatusControl({
   matterId,
@@ -27,9 +25,9 @@ export function MatterStatusControl({
 
   return (
     <div className="flex items-center gap-2">
-      <select
+      <NativeSelect
         aria-label="Matter status"
-        className={selectCls}
+        className="h-8 w-auto rounded-lg px-2.5 text-xs"
         defaultValue={status}
         disabled={pending}
         onChange={(e) => start(() => setMatterStatus(matterId, e.target.value))}
@@ -39,7 +37,7 @@ export function MatterStatusControl({
             {LABELS[s]}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       <button
         type="button"
         disabled={pending}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, User, TriangleAlert, ChevronRight, ShieldCheck } from "lucide-react";
+import { Building2, User, TriangleAlert, ChevronRight, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   CLIENT_STATUS_LABELS,
@@ -13,6 +13,7 @@ import {
 import { fmtDate } from "@/lib/format";
 import { HearingPill } from "@/components/badges";
 import { SectionCard, EmptyState } from "@/components/page-header";
+import { PageShell, SectionHeading, List, ListRow, Callout, Tag, BackLink } from "@/components/layout";
 import { PropertiesRail, type PropertyRow } from "@/components/record/properties-rail";
 import { AttributeValue } from "@/components/record/attribute-value";
 import { RuleHint } from "@/components/record/rule-hint";
@@ -93,10 +94,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   ];
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
-      <Link href="/clients" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Clients
-      </Link>
+    <PageShell>
+      <BackLink href="/clients">Clients</BackLink>
 
       <header className="mt-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -120,14 +119,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </header>
 
       {(flags?.length ?? 0) === 0 && (
-        <div className="mt-6 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-primary">
+        <Callout tone="primary" className="mt-6 flex items-center gap-2 px-4 py-2.5 text-sm">
           <ShieldCheck className="size-4" />
           No conflicts found
-        </div>
+        </Callout>
       )}
 
       {(flags?.length ?? 0) > 0 && (
-        <div className="mt-6 rounded-xl border border-urgent/40 bg-urgent/10 p-4">
+        <Callout tone="urgent" className="mt-6 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-urgent">
             <TriangleAlert className="size-4" />
             Possible conflict of interest
@@ -151,7 +150,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               </li>
             ))}
           </ul>
-        </div>
+        </Callout>
       )}
 
       <div className="mt-6 space-y-6">
@@ -162,43 +161,47 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </SectionCard>
 
         <section>
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Matters ({matterCount})</h2>
+          <SectionHeading className="mb-2">Matters ({matterCount})</SectionHeading>
           {matterCount === 0 ? (
             <EmptyState title="No matters yet" />
           ) : (
-            <ul className="divide-y overflow-hidden rounded-xl border">
+            <List>
               {matters!.map((m) => (
-                <li key={m.id}>
-                  <Link href={`/matters/${m.id}`} className="flex items-center gap-3 bg-card px-4 py-3 transition-colors hover:bg-accent/40">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{m.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {FORUM_LABELS[m.forum_type]} · <span className="font-mono tnum">{m.key}</span>
-                      </div>
-                    </div>
-                    {m.next_hearing_date ? <HearingPill date={m.next_hearing_date} /> : <span className="text-sm text-muted-foreground">—</span>}
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </Link>
-                </li>
+                <ListRow
+                  key={m.id}
+                  href={`/matters/${m.id}`}
+                  title={m.title}
+                  subtitle={
+                    <>
+                      {FORUM_LABELS[m.forum_type]} · <span className="font-mono tnum">{m.key}</span>
+                    </>
+                  }
+                  trailing={
+                    <>
+                      {m.next_hearing_date ? <HearingPill date={m.next_hearing_date} /> : <span className="text-sm text-muted-foreground">—</span>}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </>
+                  }
+                />
               ))}
-            </ul>
+            </List>
           )}
         </section>
 
         {engagementCount > 0 && (
           <section>
             <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h2 className="text-sm font-medium text-muted-foreground">Engagements ({engagementCount})</h2>
+              <SectionHeading className="mb-0">Engagements ({engagementCount})</SectionHeading>
               <RuleHint>A &ldquo;General&rdquo; engagement is auto-created per client.</RuleHint>
             </div>
-            <ul className="divide-y overflow-hidden rounded-xl border">
+            <List>
               {engagements!.map((e) => (
-                <li key={e.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
+                <ListRow key={e.id} className="justify-between text-sm">
                   <span className="font-medium">{e.name}</span>
-                  <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] capitalize text-secondary-foreground">{e.status.replace("_", " ")}</span>
-                </li>
+                  <Tag className="capitalize">{e.status.replace("_", " ")}</Tag>
+                </ListRow>
               ))}
-            </ul>
+            </List>
           </section>
         )}
 
@@ -228,11 +231,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
         {client.notes && (
           <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Notes</h2>
+            <SectionHeading className="mb-2">Notes</SectionHeading>
             <p className="rounded-xl border bg-card p-4 text-sm whitespace-pre-wrap">{client.notes}</p>
           </section>
         )}
       </div>
-    </main>
+    </PageShell>
   );
 }

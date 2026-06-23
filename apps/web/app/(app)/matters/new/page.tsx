@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createMatter } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -7,9 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FORUM_TYPES, FORUM_LABELS } from "@/lib/types";
-
-const selectCls =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+import { PageShell, BackLink } from "@/components/layout";
+import { NativeSelect } from "@/components/native-select";
 
 export default async function NewMatterPage({
   searchParams,
@@ -25,10 +22,8 @@ export default async function NewMatterPage({
     .returns<{ id: string; display_name: string }[]>();
 
   return (
-    <main className="mx-auto max-w-xl p-6 sm:p-8">
-      <Link href="/matters" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Matters
-      </Link>
+    <PageShell size="sm">
+      <BackLink href="/matters">Matters</BackLink>
       <h1 className="mb-6 mt-3 font-serif text-2xl font-semibold tracking-tight">New matter</h1>
 
       <form action={createMatter} className="space-y-4">
@@ -39,26 +34,26 @@ export default async function NewMatterPage({
 
         <div className="space-y-1.5">
           <Label htmlFor="client_id">Client</Label>
-          <select id="client_id" name="client_id" defaultValue={client ?? ""} className={selectCls}>
+          <NativeSelect id="client_id" name="client_id" defaultValue={client ?? ""}>
             <option value="">No client</option>
             {(clients ?? []).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.display_name}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="forum_type">Forum</Label>
-            <select id="forum_type" name="forum_type" defaultValue="district" className={selectCls}>
+            <NativeSelect id="forum_type" name="forum_type" defaultValue="district">
               {FORUM_TYPES.map((f) => (
                 <option key={f} value={f}>
                   {FORUM_LABELS[f]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="case_type">Case type</Label>
@@ -96,6 +91,6 @@ export default async function NewMatterPage({
           Create matter
         </Button>
       </form>
-    </main>
+    </PageShell>
   );
 }

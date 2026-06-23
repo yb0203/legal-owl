@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { PageShell } from "@/components/layout";
 import { HelpLink } from "@/components/help/help-link";
 import { TriageRow, type TriageRowItem } from "@/components/inbox/triage-row";
 
@@ -36,7 +37,7 @@ export default async function InboxPage() {
   }));
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <PageShell>
       <PageHeader
         title="Inbox"
         subtitle="Court updates waiting for your review — accept into a task, snooze, or dismiss."
@@ -52,6 +53,6 @@ export default async function InboxPage() {
           ))}
         </ul>
       )}
-    </main>
+    </PageShell>
   );
 }

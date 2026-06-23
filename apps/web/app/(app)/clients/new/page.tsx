@@ -1,13 +1,10 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClientRecord } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-const selectCls =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+import { PageShell, BackLink } from "@/components/layout";
+import { NativeSelect } from "@/components/native-select";
 
 export default async function NewClientPage({
   searchParams,
@@ -17,10 +14,8 @@ export default async function NewClientPage({
   const { error } = await searchParams;
 
   return (
-    <main className="mx-auto max-w-xl p-6 sm:p-8">
-      <Link href="/clients" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Clients
-      </Link>
+    <PageShell size="sm">
+      <BackLink href="/clients">Clients</BackLink>
       <h1 className="mb-1 mt-3 font-serif text-2xl font-semibold tracking-tight">New client</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         We&apos;ll run a quick conflict check against your existing matters.
@@ -35,18 +30,18 @@ export default async function NewClientPage({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="type">Type</Label>
-            <select id="type" name="type" defaultValue="individual" className={selectCls}>
+            <NativeSelect id="type" name="type" defaultValue="individual">
               <option value="individual">Individual</option>
               <option value="organisation">Organisation</option>
-            </select>
+            </NativeSelect>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="status">Status</Label>
-            <select id="status" name="status" defaultValue="active" className={selectCls}>
+            <NativeSelect id="status" name="status" defaultValue="active">
               <option value="lead">Lead</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-            </select>
+            </NativeSelect>
           </div>
         </div>
 
@@ -88,6 +83,6 @@ export default async function NewClientPage({
           Create client
         </Button>
       </form>
-    </main>
+    </PageShell>
   );
 }

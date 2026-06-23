@@ -57,7 +57,7 @@ export function AppSidebar({
           <SidebarGroup key={section.label}>
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-2">
                 {section.items.map(({ href, label, icon: Icon, count }) => {
                   const active = isActivePath(pathname, href);
                   const n = count ? counts[count] : 0;

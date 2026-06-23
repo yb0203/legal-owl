@@ -17,6 +17,7 @@ import {
   toggleTask,
   type TaskRelationRow,
 } from "@/app/(app)/matters/[id]/actions";
+import { NativeSelect } from "@/components/native-select";
 
 export interface TaskRow {
   id: string;
@@ -43,8 +44,8 @@ const INVERSE_KIND: Record<RelationKind, RelationKind> = {
   related: "related",
 };
 
-const selectCls =
-  "h-7 rounded-md border border-input bg-transparent px-1.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
+// Compact override for the canonical NativeSelect default (h-9 rounded-lg px-3 text-sm).
+const compactSelect = "h-7 w-auto rounded-md px-1.5 text-xs";
 
 // A relation as it applies to one task: the linked task, the kind from this
 // task's point of view, and the underlying row id (for removal).
@@ -273,9 +274,9 @@ function AddRelationForm({
   const [relatedId, setRelatedId] = useState("");
   return (
     <div className="flex flex-col gap-2 border-t pt-2.5">
-      <select
+      <NativeSelect
         aria-label="Relation kind"
-        className={selectCls}
+        className={compactSelect}
         value={kind}
         onChange={(e) => setKind(e.target.value as RelationKind)}
       >
@@ -284,10 +285,10 @@ function AddRelationForm({
             {RELATION_LABELS[k]}
           </option>
         ))}
-      </select>
-      <select
+      </NativeSelect>
+      <NativeSelect
         aria-label="Linked task"
-        className={selectCls}
+        className={compactSelect}
         value={relatedId}
         onChange={(e) => setRelatedId(e.target.value)}
       >
@@ -299,7 +300,7 @@ function AddRelationForm({
             {c.title}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       <Button
         type="button"
         size="sm"
@@ -326,13 +327,13 @@ function CreateForm({ matterId }: { matterId: string }) {
           placeholder="Add a task…  (e.g. File reply)"
           className="h-8 border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
-        <select name="priority" aria-label="Priority" className={selectCls} defaultValue="none">
+        <NativeSelect name="priority" aria-label="Priority" className={compactSelect} defaultValue="none">
           {PRIORITIES.map((p) => (
             <option key={p} value={p}>
               {PRIORITY_LABELS[p]}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         <Input name="due_date" type="date" aria-label="Due date" className="h-8 w-36" />
         <Button type="submit" size="sm">
           Add

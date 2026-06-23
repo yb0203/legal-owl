@@ -7,6 +7,7 @@ import { PageHeader, EmptyState } from "@/components/page-header";
 import { HearingPill, MatterStatusBadge } from "@/components/badges";
 import { LabelChip } from "@/components/label-chip";
 import { HelpLink } from "@/components/help/help-link";
+import { PageShell, List, ListRow } from "@/components/layout";
 import { FORUM_LABELS, type ForumType, type Label, type MatterStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -92,7 +93,7 @@ export default async function MattersPage({
     `/matters?${new URLSearchParams({ ...(q ? { q } : {}), ...(status !== "all" ? { status } : {}), ...(id ? { label: id } : {}) })}`;
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <PageShell>
       <PageHeader title="Matters" subtitle="Your case files.">
         <HelpLink anchor="add-a-matter" label="Matters" />
         <Link href="/matters/new" className={buttonVariants({ size: "sm" })}>
@@ -172,41 +173,36 @@ export default async function MattersPage({
           />
         )
       ) : (
-        <ul className="divide-y overflow-hidden rounded-xl border">
+        <List>
           {matters.map((m) => (
-            <li key={m.id}>
-              <Link
-                href={`/matters/${m.id}`}
-                className="flex items-center gap-3 bg-card px-4 py-3.5 transition-colors hover:bg-accent/40"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{m.title}</div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                    <MatterStatusBadge status={m.matter_status} />
-                    <span aria-hidden>·</span>
-                    <span>{FORUM_LABELS[m.forum_type]}</span>
-                    <span className="font-mono tnum">{m.key}</span>
-                    {m.client && <span>· {m.client.display_name}</span>}
-                  </div>
-                  {(labelsByMatter[m.id]?.length ?? 0) > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {labelsByMatter[m.id].map((l) => (
-                        <LabelChip key={l.id} label={l} />
-                      ))}
-                    </div>
-                  )}
+            <ListRow key={m.id} href={`/matters/${m.id}`}>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{m.title}</div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                  <MatterStatusBadge status={m.matter_status} />
+                  <span aria-hidden>·</span>
+                  <span>{FORUM_LABELS[m.forum_type]}</span>
+                  <span className="font-mono tnum">{m.key}</span>
+                  {m.client && <span>· {m.client.display_name}</span>}
                 </div>
-                {m.next_hearing_date ? (
-                  <HearingPill date={m.next_hearing_date} />
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
+                {(labelsByMatter[m.id]?.length ?? 0) > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {labelsByMatter[m.id].map((l) => (
+                      <LabelChip key={l.id} label={l} />
+                    ))}
+                  </div>
                 )}
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            </li>
+              </div>
+              {m.next_hearing_date ? (
+                <HearingPill date={m.next_hearing_date} />
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </ListRow>
           ))}
-        </ul>
+        </List>
       )}
-    </main>
+    </PageShell>
   );
 }
