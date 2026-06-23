@@ -64,7 +64,7 @@ flowchart LR
 2. Open the matter to see its timeline, hearings, deadlines, tasks, and documents.
 3. Check **Home** and the **Inbox** each morning — overdue and due-today work is surfaced first.
 
-> Tip: press **⌘K** (Ctrl+K) anywhere to jump to a page or matter, or to create something new.
+> Tip: use the **Search** box in the header to jump to a page or matter, or to create something new.
 `,
   },
 
@@ -75,7 +75,7 @@ flowchart LR
     body: `
 A **matter** is a single case file: an internal id (e.g. \`M-3\`), an optional **CNR** (the court's case number), a forum, parties, a status, and a next-hearing date.
 
-1. From **Matters** (or the "New" menu / ⌘K), choose **New matter**.
+1. From **Matters** (or the "New" menu / Search), choose **New matter**.
 2. Fill in the title, forum, and parties — optionally the CNR and client.
 3. Open the matter to add hearings, deadlines, tasks, documents, and notes.
 
