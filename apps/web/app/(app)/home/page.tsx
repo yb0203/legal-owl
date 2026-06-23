@@ -9,6 +9,7 @@ import { Stat, EmptyState } from "@/components/page-header";
 import { TaskRow, type CrossTask } from "@/components/tasks-list";
 import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
+import { HomeSyncButton } from "@/components/home-sync-button";
 import { ModelOrientation } from "@/components/model-orientation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageShell, Panel, SectionHeading, List, ListRow, Callout } from "@/components/layout";
@@ -111,6 +112,7 @@ export default async function HomePage() {
           <Link href="/matters/new" className={buttonVariants({ size: "sm" })}>
             <FilePlus2 className="size-4" /> New matter
           </Link>
+          <HomeSyncButton />
           <Link href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
             <Plus className="size-4" /> Add task
           </Link>

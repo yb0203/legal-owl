@@ -8,6 +8,7 @@ interface Row {
   id: string;
   kind: string;
   summary: string;
+  created_at: string;
   matter: { id: string; title: string; key: string } | null;
 }
 
@@ -23,7 +24,7 @@ export default async function InboxPage() {
 
   const { data: rows } = await supabase
     .from("triage_items")
-    .select("id, kind, summary, matter:matters(id, title, key)")
+    .select("id, kind, summary, created_at, matter:matters(id, title, key)")
     .eq("state", "pending")
     .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
     .order("created_at", { ascending: false })
@@ -33,6 +34,7 @@ export default async function InboxPage() {
     id: r.id,
     summary: r.summary,
     kindLabel: KIND_LABELS[r.kind] ?? r.kind,
+    createdAt: r.created_at,
     matter: r.matter,
   }));
 
