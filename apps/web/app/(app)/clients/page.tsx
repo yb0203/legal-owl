@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { PageShell, List, ListRow } from "@/components/layout";
 import { HelpLink } from "@/components/help/help-link";
 import { CLIENT_STATUS_LABELS, type ClientStatus, type ClientType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,7 +50,7 @@ export default async function ClientsPage({
   const clients = rows ?? [];
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <PageShell>
       <PageHeader
         title="Clients"
         subtitle={
@@ -94,33 +95,35 @@ export default async function ClientsPage({
           />
         )
       ) : (
-        <ul className="divide-y overflow-hidden rounded-xl border">
+        <List>
           {clients.map((c) => (
-            <li key={c.id}>
-              <Link href={`/clients/${c.id}`} className="flex items-center gap-3 bg-card px-4 py-3.5 transition-colors hover:bg-accent/40">
-                {c.type === "organisation" ? (
+            <ListRow
+              key={c.id}
+              href={`/clients/${c.id}`}
+              leading={
+                c.type === "organisation" ? (
                   <Building2 className="size-5 shrink-0 text-muted-foreground" />
                 ) : (
                   <User className="size-5 shrink-0 text-muted-foreground" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{c.display_name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {c.email || c.phone || (c.type === "organisation" ? "Organisation" : "Individual")}
-                  </div>
-                </div>
-                <span className="tnum text-xs text-muted-foreground">
-                  {c.matters?.[0]?.count ?? 0} matter{(c.matters?.[0]?.count ?? 0) === 1 ? "" : "s"}
-                </span>
-                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_TONE[c.status])}>
-                  {CLIENT_STATUS_LABELS[c.status]}
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            </li>
+                )
+              }
+              title={c.display_name}
+              subtitle={c.email || c.phone || (c.type === "organisation" ? "Organisation" : "Individual")}
+              trailing={
+                <>
+                  <span className="tnum text-xs text-muted-foreground">
+                    {c.matters?.[0]?.count ?? 0} matter{(c.matters?.[0]?.count ?? 0) === 1 ? "" : "s"}
+                  </span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_TONE[c.status])}>
+                    {CLIENT_STATUS_LABELS[c.status]}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </>
+              }
+            />
           ))}
-        </ul>
+        </List>
       )}
-    </main>
+    </PageShell>
   );
 }

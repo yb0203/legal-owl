@@ -4,6 +4,7 @@ import { logout } from "@/app/login/actions";
 import { DemoToggle } from "@/components/demo-toggle";
 import { ProfileForm, type ProfileValues } from "@/components/settings/profile-form";
 import { PageHeader, SectionCard } from "@/components/page-header";
+import { PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 
 export default async function SettingsPage() {
@@ -22,7 +23,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-2xl p-6 sm:p-8">
+    <PageShell size="md">
       <PageHeader title="Settings" subtitle="Your account and preferences." />
 
       <div className="space-y-6">
@@ -81,6 +82,6 @@ export default async function SettingsPage() {
           </div>
         </SectionCard>
       </div>
-    </main>
+    </PageShell>
   );
 }

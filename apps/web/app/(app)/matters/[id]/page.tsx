@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   FORUM_LABELS,
@@ -29,6 +29,8 @@ import { PropertiesRail, type PropertyRow } from "@/components/record/properties
 import { RuleHint } from "@/components/record/rule-hint";
 import { AttributeValue } from "@/components/record/attribute-value";
 import { LabelPicker } from "@/components/label-picker";
+import { PageShell, Panel, List, ListRow, Tag, BackLink } from "@/components/layout";
+import { NativeSelect } from "@/components/native-select";
 import { loadLabels } from "@/app/(app)/labels/actions";
 import type { Label } from "@/lib/types";
 import {
@@ -225,15 +227,13 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   ];
 
   return (
-    <main className="mx-auto w-full max-w-6xl p-6 sm:p-8">
-      <Link href="/matters" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="size-4" /> Matters
-      </Link>
+    <PageShell>
+      <BackLink href="/matters">Matters</BackLink>
 
-      <div className="mt-3 grid gap-6 lg:grid-cols-[20rem_1fr]">
-        {/* Facts / properties rail — the matter as one legible object. */}
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-xl border bg-card p-5">
+      <div className="mt-3 space-y-6">
+        {/* Facts / properties card — the matter as one legible object. */}
+        <aside>
+          <Panel className="p-5">
             <div className="flex items-start justify-between gap-3">
               <h1 className="min-w-0 font-serif text-xl font-semibold tracking-tight">{matter.title}</h1>
               <EditDetailsDialog
@@ -254,7 +254,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
               <div className="mb-2 text-xs text-muted-foreground">Actions</div>
               <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
             </div>
-          </div>
+          </Panel>
         </aside>
 
       <Tabs defaultValue="timeline" className="min-w-0">
@@ -324,7 +324,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="tnum text-sm font-semibold">{fmtDate(h.hearing_date)}</span>
-                      <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] capitalize text-secondary-foreground">{h.state}</span>
+                      <Tag className="capitalize">{h.state}</Tag>
                     </div>
                   </div>
                   {h.state === "scheduled" && (
@@ -350,28 +350,28 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
           <form action={addDeadline} className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
             <input type="hidden" name="matter_id" value={id} />
             <Input name="due_date" type="date" required aria-label="Due date" className="w-40" />
-            <select name="type" aria-label="Deadline type" defaultValue="internal" className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none">
+            <NativeSelect name="type" aria-label="Deadline type" defaultValue="internal" className="h-9 w-auto px-2.5">
               <option value="internal">Internal</option>
               <option value="statutory">Statutory</option>
               <option value="limitation">Limitation</option>
-            </select>
+            </NativeSelect>
             <Input name="basis" placeholder="Basis (optional)" className="min-w-40 flex-1" />
             <Button type="submit" size="sm">Add deadline</Button>
           </form>
           {(deadlines?.length ?? 0) === 0 ? (
             <EmptyState title="No deadlines" hint="Statutory and limitation dates are computed by rule, never guessed." />
           ) : (
-            <ul className="divide-y overflow-hidden rounded-xl border">
+            <List>
               {deadlines!.map((d) => (
-                <li key={d.id} className="flex items-center justify-between gap-3 bg-card px-4 py-3 text-sm">
+                <ListRow key={d.id} className="justify-between text-sm">
                   <div>
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-secondary-foreground">{DEADLINE_LABELS[d.type] ?? d.type}</span>
+                    <Tag>{DEADLINE_LABELS[d.type] ?? d.type}</Tag>
                     {d.basis && <span className="ml-2 text-muted-foreground">{d.basis}</span>}
                   </div>
                   <span className="tnum shrink-0 text-sm font-medium">{fmtDateYear(d.due_date)}</span>
-                </li>
+                </ListRow>
               ))}
-            </ul>
+            </List>
           )}
         </TabsContent>
 
@@ -385,19 +385,19 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
               required
               className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
-            <select name="source" defaultValue="lawyer_upload" aria-label="Document type" className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none">
+            <NativeSelect name="source" defaultValue="lawyer_upload" aria-label="Document type" className="h-9 w-auto px-2.5">
               <option value="lawyer_upload">Filing / upload</option>
               <option value="court_order">Court order</option>
               <option value="judgement">Judgement</option>
-            </select>
+            </NativeSelect>
             <Button type="submit" size="sm">Upload</Button>
           </form>
           {(documents?.length ?? 0) === 0 ? (
             <EmptyState title="No documents yet" hint="Upload orders, judgements and filings to keep the file together." />
           ) : (
-            <ul className="divide-y overflow-hidden rounded-xl border">
+            <List>
               {documents!.map((d) => (
-                <li key={d.id} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
+                <ListRow key={d.id} className="text-sm">
                   <FileText className="size-4 shrink-0 text-muted-foreground" />
                   <form action={downloadDocument} className="min-w-0 flex-1">
                     <input type="hidden" name="storage_path" value={d.storage_path} />
@@ -405,13 +405,13 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
                   </form>
                   <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
                   <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path} name={d.name} />
-                </li>
+                </ListRow>
               ))}
-            </ul>
+            </List>
           )}
         </TabsContent>
       </Tabs>
       </div>
-    </main>
+    </PageShell>
   );
 }

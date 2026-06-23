@@ -16,9 +16,7 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-
-const selectCls =
-  "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+import { NativeSelect } from "@/components/native-select";
 
 export function EditDetailsDialog({
   matter,
@@ -59,18 +57,17 @@ export function EditDetailsDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="forum_type">Forum</Label>
-              <select
+              <NativeSelect
                 id="forum_type"
                 name="forum_type"
                 defaultValue={matter.forum_type}
-                className={selectCls}
               >
                 {FORUM_TYPES.map((f) => (
                   <option key={f} value={f}>
                     {FORUM_LABELS[f]}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="case_type">Case type</Label>

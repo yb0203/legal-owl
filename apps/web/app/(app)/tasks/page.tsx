@@ -3,6 +3,8 @@ import { ListTodo, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSystemWorkflowStates } from "@/lib/db";
 import { PageHeader, EmptyState } from "@/components/page-header";
+import { PageShell, Panel, SectionHeading } from "@/components/layout";
+import { NativeSelect } from "@/components/native-select";
 import { TasksList, TaskRow, type CrossTask } from "@/components/tasks-list";
 import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
@@ -18,9 +20,6 @@ const FILTERS = [
   { value: "done", label: "Done" },
   { value: "all", label: "All" },
 ] as const;
-
-const selectCls =
-  "h-9 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export default async function TasksPage({
   searchParams,
@@ -82,16 +81,17 @@ export default async function TasksPage({
   const matterOptions = matters ?? [];
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <PageShell>
       <PageHeader title="Tasks" subtitle="Everything you need to do across your matters.">
         <HelpLink anchor="tasks" label="Tasks" />
       </PageHeader>
 
       {/* Quick-create — a task always belongs to a matter. */}
       {matterOptions.length > 0 && (
-        <form
+        <Panel
+          as="form"
           action={createQuickTask}
-          className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2.5"
+          className="mb-4 flex flex-wrap items-center gap-2 p-2.5"
         >
           <Plus className="size-4 shrink-0 text-muted-foreground" />
           <Input
@@ -100,7 +100,13 @@ export default async function TasksPage({
             placeholder="Add a task…"
             className="h-9 min-w-40 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
           />
-          <select name="matter_id" required aria-label="Matter" defaultValue="" className={selectCls}>
+          <NativeSelect
+            name="matter_id"
+            required
+            aria-label="Matter"
+            defaultValue=""
+            className="w-auto rounded-md px-2"
+          >
             <option value="" disabled>
               Matter…
             </option>
@@ -109,19 +115,24 @@ export default async function TasksPage({
                 {m.title}
               </option>
             ))}
-          </select>
-          <select name="priority" aria-label="Priority" defaultValue="none" className={selectCls}>
+          </NativeSelect>
+          <NativeSelect
+            name="priority"
+            aria-label="Priority"
+            defaultValue="none"
+            className="w-auto rounded-md px-2"
+          >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {PRIORITY_LABELS[p]}
               </option>
             ))}
-          </select>
+          </NativeSelect>
           <Input name="due_date" type="date" aria-label="Due date" className="h-9 w-36" />
           <Button type="submit" size="sm">
             Add
           </Button>
-        </form>
+        </Panel>
       )}
 
       <div className="mb-4 flex flex-wrap gap-1.5">
@@ -199,9 +210,9 @@ export default async function TasksPage({
           <TimeGroups groups={groups} renderRow={(t) => <TaskRow task={t} states={states} />} rowKey={(t) => t.id} />
           {undated.length > 0 && (
             <section>
-              <h2 className="mb-2 font-serif text-base font-semibold tracking-tight text-muted-foreground">
+              <SectionHeading variant="serif" className="mb-2">
                 No date
-              </h2>
+              </SectionHeading>
               <TasksList tasks={undated} states={states} />
             </section>
           )}
@@ -209,6 +220,6 @@ export default async function TasksPage({
       ) : (
         <TasksList tasks={tasks} states={states} />
       )}
-    </main>
+    </PageShell>
   );
 }

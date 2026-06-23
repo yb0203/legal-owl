@@ -8,7 +8,8 @@ The production app lives in **`apps/web`** (Next.js App Router on Vercel + Supab
 Streamlit eCourts prototype lives in `prototype/ecourts-streamlit/` (reference only; it has its own
 pytest suite and migrations — the web app does not). `STRATEGY.md` is the source of truth for product
 direction; `docs/ARCHITECTURE.md` and `docs/specs/` are the durable technical/requirements docs, with
-supporting `docs/research/`, `docs/plans/`, and `docs/design/frontend-design-learnings.md`.
+supporting `docs/research/`, `docs/plans/`, `docs/runbooks/`, `docs/brainstorms/`, and
+`docs/design/frontend-design-learnings.md`.
 
 ### Web app — `apps/web`
 
@@ -35,7 +36,8 @@ Architecture & conventions:
   client islands via `useTransition`).
 - **Supabase** (`@supabase/ssr`, cookie-per-request). Clients live in `lib/supabase/`
   (`client.ts` browser, `server.ts` RSC/actions, `middleware.ts` session refresh wired through the
-  app's `middleware.ts`). RLS on every table keyed on `auth.uid() = lawyer_id`. Schema in
+  app's `proxy.ts` — the Next.js 16 rename of `middleware.ts`). RLS on every table keyed on
+  `auth.uid() = lawyer_id`. Schema in
   `supabase/migrations/` (`config.toml` alongside); apply with `supabase db push --db-url "$DBURL"`
   using the session pooler (URL-encode the DB password with `safe=''` — a literal `/` in it
   otherwise breaks URL parsing). Private Storage bucket `case-documents` holds uploaded files at path
@@ -47,19 +49,31 @@ Architecture & conventions:
 - **UI: shadcn on the Base UI registry (NOT Radix).** `components.json` style is `base-nova`,
   base color `neutral`, icons `lucide`. Components use the `render` prop, not `asChild`; Base UI
   `Button`/menu items default to `type="button"` (always set `type="submit"` on form buttons). Add
-  components via the shadcn MCP / CLI. Toasts use `sonner`; the command palette uses `cmdk`. Shared
-  design-system atoms live in `components/` (`badges.tsx`, `page-header.tsx`), shared types/utils in
-  `lib/types.ts` and `lib/format.ts` (dates render `dd-MMM`), data helpers in `lib/db.ts`, and
-  `lib/auth.ts` / `lib/redirect.ts` / `lib/utils.ts` round out the helpers.
-- **Nomenclature (neutral-professional):** nav is `Home · Calendar · Matters · Inbox · Tasks ·
-  Clients · Settings`. Internal `workflow_states` names (To-Do, Awaiting Filing, …) are rendered via
-  `StatusBadge`.
+  components via the shadcn MCP / CLI. Toasts use `sonner`; the command palette uses `cmdk`. **Build
+  with the design-system primitives, never inline Tailwind for structure:** semantic atoms in
+  `components/badges.tsx` (`StatusBadge`, `DueDateBadge`, `HearingPill`, `SourceChip`, …) and
+  `components/page-header.tsx` (`PageHeader`, `SectionCard`, `Stat`, `EmptyState`); structural
+  primitives in `components/layout.tsx` (`PageShell` — every page's `<main>`; `Panel` and `Callout`
+  are polymorphic via `as`; `List` + `ListRow`; `SectionHeading`; `Tag`; `BackLink`) and
+  `components/native-select.tsx` (`NativeSelect` for `<select>` in Server-Action forms). Don't
+  hand-roll `mx-auto … max-w-3xl`, `divide-y … rounded-xl border`, tone-tinted callout banners, or the
+  select class string — use the primitive. Shared types/utils in
+  `lib/types.ts` and `lib/format.ts` (dates render `dd-MMM`), data helpers in `lib/db.ts`, nav in
+  `lib/nav.ts`, in-app help content in `lib/help/`, and `lib/auth.ts` / `lib/redirect.ts` /
+  `lib/utils.ts` round out the helpers.
+- **Nomenclature (neutral-professional):** navigation is defined once in `lib/nav.ts` (the single
+  source of truth consumed by the sidebar, command palette, and header breadcrumb — keep them from
+  drifting). It is grouped the way a lawyer works: **Today** (Home, Inbox, Tasks, Calendar) and
+  **Case files** (Matters, Clients), with **Help** and **Settings** in the footer. User-defined
+  **labels** (the `matter_labels` table) can be attached to matters/tasks and managed at `/labels`.
+  Internal `workflow_states` names (To-Do, Awaiting Filing, …) are rendered via `StatusBadge`.
 - **Theme is a deliberate off-dark mint/lemon palette** (`app/globals.css`), chosen by the user —
   do NOT "fix" it back to the light "legal ledger" look described in `docs/design/`. Fonts: Geist
   (sans), Geist Mono (case numbers/CNRs), Source Serif 4 (headings).
 - Secrets live in gitignored `.env` (root: Supabase admin/`SUPABASE_DB_PASSWORD`, `RESEND_API_KEY`,
   `ECOURTS_API_KEY`) and `apps/web/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`) — never commit them. No `.env.example` exists yet.
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `RESEND_API_KEY`) — never commit them. Templates are checked in at
+  root `.env.example` (admin/CLI creds) and `apps/web/.env.example` (app-runtime vars); copy and fill.
 
 ## Product context
 

@@ -11,6 +11,7 @@ import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
 import { ModelOrientation } from "@/components/model-orientation";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { PageShell, Panel, SectionHeading, List, ListRow, Callout } from "@/components/layout";
 import { seedSampleData } from "./actions";
 
 interface HearingLite {
@@ -100,7 +101,7 @@ export default async function HomePage() {
   const overdueCount = groups.find((g) => g.bucket === "overdue")?.items.length ?? 0;
 
   return (
-    <main className="mx-auto w-full max-w-6xl p-6 sm:p-8">
+    <PageShell>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl font-semibold tracking-tight">{greeting()}</h1>
@@ -126,107 +127,102 @@ export default async function HomePage() {
         <Stat label="In inbox" value={inboxCount ?? 0} href="/inbox" />
       </section>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-2">
-        {/* Left: the day's fixed obligations. */}
-        <div className="space-y-8">
-          <section>
-            <h2 className="mb-3 text-sm font-medium text-muted-foreground">Next hearings</h2>
-            {(hearings?.length ?? 0) === 0 ? (
-              <EmptyState
-                icon={Landmark}
-                title="No upcoming hearings"
-                description="Scheduled hearings across your matters appear here, soonest first."
-              />
-            ) : (
-              <ul className="divide-y overflow-hidden rounded-xl border">
-                {hearings!.map((h) => (
-                  <li key={h.id}>
-                    <Link
-                      href={h.matter ? `/matters/${h.matter.id}` : "#"}
-                      className="flex items-center gap-3 bg-card px-4 py-3 transition-colors hover:bg-accent/40"
-                    >
-                      <Landmark className="size-4 shrink-0 text-primary" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{h.matter?.title ?? "Matter"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {h.purpose ?? "Hearing"}
-                          {h.matter ? ` · ${FORUM_LABELS[h.matter.forum_type]}` : ""}
-                        </div>
-                      </div>
-                      <HearingPill date={h.hearing_date} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+      {/* Single column, ordered by what a lawyer acts on first:
+          what changed → today's hearings → deadlines → the rest of the work. */}
+      <div className="mt-8 space-y-8">
+        {(inboxCount ?? 0) > 0 && (
+          <Callout
+            as={Link}
+            tone="lemon"
+            href="/inbox"
+            className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-lemon/15"
+          >
+            <span className="font-medium">
+              {inboxCount} court update{inboxCount === 1 ? "" : "s"} need your review
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              Open inbox <ChevronRight className="size-4" />
+            </span>
+          </Callout>
+        )}
 
-          {(deadlines?.length ?? 0) > 0 && (
-            <section>
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">Upcoming deadlines</h2>
-              <ul className="divide-y overflow-hidden rounded-xl border">
-                {deadlines!.map((d) => (
-                  <li key={d.id} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
-                    <AlarmClock className="size-4 shrink-0 text-lemon" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {d.basis ?? `${d.type[0].toUpperCase()}${d.type.slice(1)} deadline`}
-                      {d.matter && <span className="ml-2 text-xs text-muted-foreground">{d.matter.title}</span>}
-                    </span>
-                    <span className="tnum shrink-0 text-xs text-muted-foreground">
-                      {fmtDate(d.due_date)} · {relativeDay(d.due_date)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+        <section>
+          <SectionHeading>Next hearings</SectionHeading>
+          {(hearings?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={Landmark}
+              title="No upcoming hearings"
+              description="Scheduled hearings across your matters appear here, soonest first."
+            />
+          ) : (
+            <List>
+              {hearings!.map((h) => (
+                <ListRow
+                  key={h.id}
+                  href={h.matter ? `/matters/${h.matter.id}` : "#"}
+                  leading={<Landmark className="size-4 shrink-0 text-primary" />}
+                  title={h.matter?.title ?? "Matter"}
+                  subtitle={
+                    <>
+                      {h.purpose ?? "Hearing"}
+                      {h.matter ? ` · ${FORUM_LABELS[h.matter.forum_type]}` : ""}
+                    </>
+                  }
+                  trailing={<HearingPill date={h.hearing_date} />}
+                />
+              ))}
+            </List>
           )}
-        </div>
+        </section>
 
-        {/* Right: the work to action, grouped by urgency. */}
-        <div className="space-y-6">
-          {(inboxCount ?? 0) > 0 && (
-            <Link
-              href="/inbox"
-              className="flex items-center justify-between gap-3 rounded-xl border border-lemon/40 bg-lemon/10 px-4 py-3 text-sm transition-colors hover:bg-lemon/15"
-            >
-              <span className="font-medium">
-                {inboxCount} court update{inboxCount === 1 ? "" : "s"} need your review
-              </span>
-              <span className="flex items-center gap-1 text-muted-foreground">
-                Open inbox <ChevronRight className="size-4" />
-              </span>
-            </Link>
-          )}
-
+        {(deadlines?.length ?? 0) > 0 && (
           <section>
-            <h2 className="mb-3 text-sm font-medium text-muted-foreground">Your work</h2>
-            {work.length === 0 ? (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-sm">
-                  <CircleCheck className="size-4 shrink-0 text-primary" />
-                  <span className="text-muted-foreground">
-                    You&apos;re clear for the week — nothing due in the next 7 days.
+            <SectionHeading>Upcoming deadlines</SectionHeading>
+            <List>
+              {deadlines!.map((d) => (
+                <ListRow key={d.id} className="py-3 text-sm">
+                  <AlarmClock className="size-4 shrink-0 text-lemon" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {d.basis ?? `${d.type[0].toUpperCase()}${d.type.slice(1)} deadline`}
+                    {d.matter && <span className="ml-2 text-xs text-muted-foreground">{d.matter.title}</span>}
                   </span>
-                </div>
-                {(openTasks ?? 0) === 0 && <ModelOrientation />}
-              </div>
-            ) : (
-              <TimeGroups
-                groups={groups}
-                renderRow={(t) => <TaskRow task={t} states={states} />}
-                rowKey={(t) => t.id}
-              />
-            )}
+                  <span className="tnum shrink-0 text-xs text-muted-foreground">
+                    {fmtDate(d.due_date)} · {relativeDay(d.due_date)}
+                  </span>
+                </ListRow>
+              ))}
+            </List>
           </section>
-        </div>
+        )}
+
+        <section>
+          <SectionHeading>Your work</SectionHeading>
+          {work.length === 0 ? (
+            <div className="space-y-6">
+              <Panel className="flex items-center gap-3 px-4 py-3.5 text-sm">
+                <CircleCheck className="size-4 shrink-0 text-primary" />
+                <span className="text-muted-foreground">
+                  You&apos;re clear for the week — nothing due in the next 7 days.
+                </span>
+              </Panel>
+              {(openTasks ?? 0) === 0 && <ModelOrientation />}
+            </div>
+          ) : (
+            <TimeGroups
+              groups={groups}
+              renderRow={(t) => <TaskRow task={t} states={states} />}
+              rowKey={(t) => t.id}
+            />
+          )}
+        </section>
       </div>
-    </main>
+    </PageShell>
   );
 }
 
 function Onboarding() {
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col items-center p-6 py-16 text-center sm:py-24">
+    <PageShell size="sm" className="flex flex-col items-center py-16 text-center sm:py-24">
       <h1 className="font-serif text-3xl font-semibold tracking-tight">Welcome to Legal Owl</h1>
       <p className="mt-3 text-muted-foreground">
         Track your cases, turn every court update into action, and keep clients informed.
@@ -244,6 +240,6 @@ function Onboarding() {
       </div>
       <p className="mt-4 text-xs text-muted-foreground">You can toggle sample data any time in Settings.</p>
       <ModelOrientation className="mt-10 w-full text-left" />
-    </main>
+    </PageShell>
   );
 }

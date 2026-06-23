@@ -5,6 +5,7 @@ import { PageHeader, EmptyState } from "@/components/page-header";
 import { HelpLink } from "@/components/help/help-link";
 import { fmtDateYear, relativeDay, isToday, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { PageShell, List, ListRow } from "@/components/layout";
 
 interface HearingRow {
   id: string;
@@ -76,7 +77,7 @@ export default async function CalendarPage() {
   }
 
   const renderRow = (it: AgendaItem) => (
-    <li key={it.key} className="flex items-center gap-3 bg-card px-4 py-3 text-sm">
+    <ListRow key={it.key} className="py-3 text-sm">
       {it.kind === "hearing" ? (
         <Landmark className="size-4 shrink-0 text-primary" />
       ) : (
@@ -91,11 +92,11 @@ export default async function CalendarPage() {
           {it.matter.title}
         </Link>
       )}
-    </li>
+    </ListRow>
   );
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+    <PageShell>
       <PageHeader title="Calendar" subtitle="Hearings and deadlines across all your matters.">
         <HelpLink anchor="calendar" label="Calendar" />
       </PageHeader>
@@ -114,9 +115,9 @@ export default async function CalendarPage() {
                 <h2 className="font-serif text-base font-semibold tracking-tight text-urgent">Overdue</h2>
                 <span className="tnum text-xs font-medium text-urgent">{overdueItems.length}</span>
               </div>
-              <ul className="divide-y overflow-hidden rounded-xl border border-urgent/40">
+              <List tone="urgent">
                 {overdueItems.map(renderRow)}
-              </ul>
+              </List>
             </section>
           )}
 
@@ -130,12 +131,12 @@ export default async function CalendarPage() {
                     {relativeDay(date)}
                   </span>
                 </div>
-                <ul className="divide-y overflow-hidden rounded-xl border">{dayItems.map(renderRow)}</ul>
+                <List>{dayItems.map(renderRow)}</List>
               </section>
             );
           })}
         </div>
       )}
-    </main>
+    </PageShell>
   );
 }
