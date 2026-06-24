@@ -6,18 +6,18 @@ import { HelpLink } from "@/components/help/help-link";
 import { fmtDateYear, relativeDay, isToday, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PageShell, List, ListRow } from "@/components/layout";
+import type { TaskAttributes } from "@/lib/types";
 
 interface HearingRow {
   id: string;
-  hearing_date: string;
-  purpose: string | null;
+  due_date: string | null;
+  attributes: TaskAttributes;
   matter: { id: string; title: string } | null;
 }
 interface DeadlineRow {
   id: string;
-  due_date: string;
-  type: string;
-  basis: string | null;
+  due_date: string | null;
+  attributes: TaskAttributes;
   matter: { id: string; title: string } | null;
 }
 
@@ -37,33 +37,44 @@ export default async function CalendarPage() {
   // and all deadlines, then surface overdue first.
   const [{ data: hearings }, { data: deadlines }] = await Promise.all([
     supabase
-      .from("hearings")
-      .select("id, hearing_date, purpose, matter:matters(id, title)")
-      .eq("state", "scheduled")
-      .order("hearing_date", { ascending: true })
+      .from("tasks")
+      .select("id, due_date, attributes, matter:matters(id, title)")
+      .eq("type", "hearing")
+      .eq("attributes->>court_state", "scheduled")
+      .order("due_date", { ascending: true })
       .returns<HearingRow[]>(),
     supabase
-      .from("deadlines")
-      .select("id, due_date, type, basis, matter:matters(id, title)")
+      .from("tasks")
+      .select("id, due_date, attributes, matter:matters(id, title)")
+      .eq("type", "deadline")
       .order("due_date", { ascending: true })
       .returns<DeadlineRow[]>(),
   ]);
 
+  const deadlineLabel = (t?: string) => {
+    const s = t ?? "internal";
+    return `${s[0].toUpperCase()}${s.slice(1)} deadline`;
+  };
+
   const items: AgendaItem[] = [
-    ...(hearings ?? []).map((h): AgendaItem => ({
-      key: `h-${h.id}`,
-      date: h.hearing_date,
-      kind: "hearing",
-      label: h.purpose ?? "Hearing",
-      matter: h.matter,
-    })),
-    ...(deadlines ?? []).map((d): AgendaItem => ({
-      key: `d-${d.id}`,
-      date: d.due_date,
-      kind: "deadline",
-      label: d.basis ?? `${d.type[0].toUpperCase()}${d.type.slice(1)} deadline`,
-      matter: d.matter,
-    })),
+    ...(hearings ?? [])
+      .filter((h) => h.due_date)
+      .map((h): AgendaItem => ({
+        key: `h-${h.id}`,
+        date: h.due_date!,
+        kind: "hearing",
+        label: h.attributes?.purpose ?? "Hearing",
+        matter: h.matter,
+      })),
+    ...(deadlines ?? [])
+      .filter((d) => d.due_date)
+      .map((d): AgendaItem => ({
+        key: `d-${d.id}`,
+        date: d.due_date!,
+        kind: "deadline",
+        label: d.attributes?.basis ?? deadlineLabel(d.attributes?.deadline_type),
+        matter: d.matter,
+      })),
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   // Overdue is pinned first and loudest; the rest stays date-grouped & chronological.

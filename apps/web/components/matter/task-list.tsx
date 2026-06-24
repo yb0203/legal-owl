@@ -71,11 +71,11 @@ export function TaskList({
   const [pending, start] = useTransition();
   const [relations, setRelations] = useState<TaskRelationRow[]>([]);
 
-  const addRelation = (actionId: string, relatedId: string, kind: string) => {
+  const addRelation = (taskId: string, relatedId: string, kind: string) => {
     if (!relatedId) return;
     const fd = new FormData();
     fd.set("matter_id", matterId);
-    fd.set("action_id", actionId);
+    fd.set("task_id", taskId);
     fd.set("related_id", relatedId);
     fd.set("kind", kind);
     start(async () => {
@@ -111,10 +111,10 @@ export function TaskList({
     const out: TaskRelationView[] = [];
     for (const r of relations) {
       const kind = r.kind as RelationKind;
-      if (r.action_id === taskId) {
+      if (r.task_id === taskId) {
         out.push({ relationId: r.id, kind, otherId: r.related_id });
       } else if (r.related_id === taskId) {
-        out.push({ relationId: r.id, kind: INVERSE_KIND[kind], otherId: r.action_id });
+        out.push({ relationId: r.id, kind: INVERSE_KIND[kind], otherId: r.task_id });
       }
     }
     return out;

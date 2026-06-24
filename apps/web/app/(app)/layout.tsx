@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getWaitlistAccess } from "@/lib/auth";
+import { getSystemStateId } from "@/lib/db";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { SampleDataBanner } from "@/components/sample-data-banner";
@@ -20,6 +21,7 @@ export default async function AppLayout({
   if (!(await getWaitlistAccess(supabase, user.email))) redirect("/waitlist");
 
   const today = new Date().toISOString().slice(0, 10);
+  const triageId = await getSystemStateId(supabase, "Triage");
   const [
     { count: inboxCount },
     { count: tasksDueToday },
@@ -28,20 +30,24 @@ export default async function AppLayout({
     { count: sampleCount },
   ] = await Promise.all([
     supabase
-      .from("triage_items")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("state", "pending"),
+      .eq("type", "task")
+      .eq("state_id", triageId ?? ""),
     // "Due today" badge counts what needs action now: due today or already overdue.
     supabase
-      .from("actions")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
+      .eq("type", "task")
+      .neq("state_id", triageId ?? "")
       .is("completed_at", null)
       .lte("due_date", today),
     supabase
-      .from("hearings")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("state", "scheduled")
-      .eq("hearing_date", today),
+      .eq("type", "hearing")
+      .eq("attributes->>court_state", "scheduled")
+      .eq("due_date", today),
     supabase
       .from("matters")
       .select("id, title, key")

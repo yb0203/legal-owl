@@ -32,10 +32,11 @@ export default async function TasksPage({
 
   const [{ data: rows }, states, { data: matters }, { data: labelRows }, { data: assignmentRows }] = await Promise.all([
     supabase
-      .from("actions")
+      .from("tasks")
       .select(
         "id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type), matter:matters(id, title)",
       )
+      .eq("type", "task")
       .order("due_date", { ascending: true, nullsFirst: false })
       .returns<CrossTask[]>(),
     getSystemWorkflowStates(supabase),
@@ -46,7 +47,11 @@ export default async function TasksPage({
       .order("created_at", { ascending: false })
       .returns<{ id: string; title: string }[]>(),
     supabase.from("labels").select("id, name, color").order("name").returns<Label[]>(),
-    supabase.from("action_labels").select("action_id, label_id").returns<{ action_id: string; label_id: string }[]>(),
+    supabase
+      .from("taggings")
+      .select("target_id, label_id")
+      .eq("target_type", "task")
+      .returns<{ target_id: string; label_id: string }[]>(),
   ]);
 
   const labels = labelRows ?? [];
@@ -54,7 +59,7 @@ export default async function TasksPage({
   const labelsByTask: Record<string, Label[]> = {};
   for (const a of assignmentRows ?? []) {
     const l = labelById.get(a.label_id);
-    if (l) (labelsByTask[a.action_id] ??= []).push(l);
+    if (l) (labelsByTask[a.target_id] ??= []).push(l);
   }
   const all = (rows ?? []).map((t) => ({ ...t, labels: labelsByTask[t.id] ?? [] }));
   const isDone = (t: CrossTask) => !!t.completed_at;

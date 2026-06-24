@@ -17,36 +17,38 @@ export async function getSystemWorkflowStates(
 // Shared, reusable data helpers. These take the request-scoped (authed) Supabase
 // client so RLS applies — they are NOT server actions themselves.
 
-/** Sequential human key like M-7 / ACT-12, scoped to the lawyer via RLS. */
+/**
+ * Sequential human key like M-7 / T-12, scoped to the lawyer via RLS. Only
+ * type='task' rows are keyed, so the tasks count is scoped to that type
+ * (hearings/deadlines/triage rows stay keyless and don't inflate the sequence).
+ */
 export async function nextKey(
   supabase: SupabaseClient,
-  table: "matters" | "actions",
+  table: "matters" | "tasks",
   prefix: string,
 ): Promise<string> {
-  const { count } = await supabase.from(table).select("id", { count: "exact", head: true });
+  let query = supabase.from(table).select("id", { count: "exact", head: true });
+  if (table === "tasks") query = query.eq("type", "task");
+  const { count } = await query;
   return `${prefix}${(count ?? 0) + 1}`;
 }
 
-/** Every client gets a default "General" engagement; create it if missing. */
-export async function ensureGeneralEngagement(
+/**
+ * Resolve a system workflow state id by name (lawyer_id null). Used to park
+ * synced updates in the fixed 'Triage' state (the Inbox) and to accept/dismiss
+ * by moving to 'To-Do' / 'Cancelled'.
+ */
+export async function getSystemStateId(
   supabase: SupabaseClient,
-  lawyerId: string,
-  clientId: string,
-): Promise<string> {
-  const { data: existing } = await supabase
-    .from("engagements")
-    .select("id")
-    .eq("client_id", clientId)
-    .eq("name", "General")
-    .maybeSingle();
-  if (existing) return existing.id as string;
-
+  name: string,
+): Promise<string | null> {
   const { data } = await supabase
-    .from("engagements")
-    .insert({ lawyer_id: lawyerId, client_id: clientId, name: "General" })
+    .from("workflow_states")
     .select("id")
-    .single();
-  return data!.id as string;
+    .is("lawyer_id", null)
+    .eq("name", name)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
 }
 
 function normalize(name: string): string {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirect";
-import { ensureGeneralEngagement, runConflictCheck } from "@/lib/db";
+import { runConflictCheck } from "@/lib/db";
 
 export async function createClientRecord(formData: FormData) {
   const supabase = await createServerClient();
@@ -37,8 +37,6 @@ export async function createClientRecord(formData: FormData) {
     .single();
 
   if (error) redirectWithError("/clients/new", error.message);
-
-  await ensureGeneralEngagement(supabase, lawyer_id, inserted!.id);
 
   // Advisory conflict check against existing matter parties.
   const matches = await runConflictCheck(supabase, display_name);

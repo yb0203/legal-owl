@@ -97,62 +97,92 @@ export const PRIORITY_LABELS: Record<ActionPriority, string> = {
 
 export type EventSource = "ecourt" | "lawyer_manual" | "system";
 export type HearingStateType = "scheduled" | "held" | "adjourned";
-export type TriageStateType = "pending" | "accepted" | "dismissed";
 
-export interface Action {
+// ── Task-first model ─────────────────────────────────────────────────────────
+// One base entity (`tasks`) unifies the old actions/hearings/deadlines/triage.
+// `type` selects the flavour; type-specific legal fields live in `attributes`.
+export const TASK_TYPES = ["task", "hearing", "deadline"] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+export type TaskSource = "manual" | "triage" | "template" | "sync";
+
+/** type='hearing' attributes. */
+export interface HearingAttributes {
+  purpose?: string | null;
+  outcome?: string | null;
+  court_state?: HearingStateType;
+  ordinal?: number;
+}
+/** type='deadline' attributes. */
+export interface DeadlineAttributes {
+  basis?: string | null;
+  deadline_type?: "limitation" | "statutory" | "internal";
+}
+/** type='task' parked in the Triage state (the Inbox). */
+export interface TriageAttributes {
+  triage_kind?: string;
+}
+export type TaskAttributes = HearingAttributes & DeadlineAttributes & TriageAttributes;
+
+/** A raw `tasks` row (DB shape). Reads shape these into the DTOs below. */
+export interface TaskRecord {
   id: string;
-  key: string;
+  lawyer_id: string;
+  matter_id: string;
+  type: TaskType;
+  key: string | null;
   title: string;
   description: string | null;
+  state_id: string | null;
   priority: ActionPriority;
   due_date: string | null;
   completed_at: string | null;
-  matter_id: string;
-  state?: Pick<WorkflowState, "name" | "type"> | null;
-  matter?: Pick<Matter, "id" | "title"> | null;
+  source: TaskSource;
+  parent_id: string | null;
+  snoozed_until: string | null;
+  attributes: TaskAttributes;
+  created_at: string;
 }
 
-export interface Hearing {
-  id: string;
-  hearing_date: string;
-  purpose: string | null;
-  outcome: string | null;
-  state: HearingStateType;
-}
+// ── Activity (immutable audit/timeline: court_events + remarks merged) ────────
+export type ActivityKind = "court_event" | "remark" | "system";
 
-export interface Deadline {
+export interface ActivityRow {
   id: string;
-  type: "limitation" | "statutory" | "internal";
-  due_date: string;
-  basis: string | null;
-}
-
-export interface CourtEvent {
-  id: string;
-  event_type: string;
+  kind: ActivityKind;
+  event_type: string | null;
+  body: string | null;
   previous_value: string | null;
   new_value: string | null;
+  source: EventSource;
   occurred_at: string | null;
-  detected_at: string;
-  source_type: EventSource;
-}
-
-export interface Remark {
-  id: string;
-  body: string;
   created_at: string;
 }
 
-export interface TriageItem {
+// ── Chat foundation (Vercel Chat SDK / AI SDK UIMessage) — no UI this pass ───
+export type ConversationKind = "assistant" | "client";
+export type MessageRole = "system" | "user" | "assistant" | "tool";
+
+export interface Conversation {
   id: string;
-  kind: string;
-  summary: string;
-  state: TriageStateType;
+  matter_id: string | null;
+  client_id: string | null;
+  kind: ConversationKind;
+  title: string | null;
+  visibility: string;
+  last_message_at: string | null;
   created_at: string;
-  matter?: Pick<Matter, "id" | "title" | "key"> | null;
 }
 
-// ── Client → Engagement layer ───────────────────────────────────────────────
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: MessageRole;
+  parts: unknown[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+// ── Clients & contacts ──────────────────────────────────────────────────────
 export type ClientType = "individual" | "organisation";
 export type ClientStatus = "lead" | "active" | "inactive";
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
@@ -182,17 +212,6 @@ export interface Contact {
   role: string | null;
   email: string | null;
   phone: string | null;
-}
-
-export type EngagementStatus = "open" | "on_hold" | "closed";
-
-export interface Engagement {
-  id: string;
-  client_id: string;
-  name: string;
-  scope_note: string | null;
-  status: EngagementStatus;
-  created_at: string;
 }
 
 export type DocumentSource =

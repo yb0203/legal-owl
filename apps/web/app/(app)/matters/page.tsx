@@ -59,17 +59,21 @@ export default async function MattersPage({
   // post-fetch (small data; mirrors the post-fetch style already in this file).
   const [{ data: labelRows }, { data: assignmentRows }] = await Promise.all([
     supabase.from("labels").select("id, name, color").order("name").returns<Label[]>(),
-    supabase.from("matter_labels").select("matter_id, label_id").returns<{ matter_id: string; label_id: string }[]>(),
+    supabase
+      .from("taggings")
+      .select("target_id, label_id")
+      .eq("target_type", "matter")
+      .returns<{ target_id: string; label_id: string }[]>(),
   ]);
   const labels = labelRows ?? [];
   const labelsByMatter: Record<string, Label[]> = {};
   const labelById = new Map(labels.map((l) => [l.id, l]));
   for (const a of assignmentRows ?? []) {
     const l = labelById.get(a.label_id);
-    if (l) (labelsByMatter[a.matter_id] ??= []).push(l);
+    if (l) (labelsByMatter[a.target_id] ??= []).push(l);
   }
   if (label) {
-    const tagged = new Set((assignmentRows ?? []).filter((a) => a.label_id === label).map((a) => a.matter_id));
+    const tagged = new Set((assignmentRows ?? []).filter((a) => a.label_id === label).map((a) => a.target_id));
     matters = matters.filter((m) => tagged.has(m.id));
   }
 

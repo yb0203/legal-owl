@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { NormalizedCase } from "@/lib/ecourts/types";
+import { getSystemStateId } from "@/lib/db";
 
 type DB = Awaited<ReturnType<typeof createClient>>;
 
@@ -12,9 +13,9 @@ export interface MatterSyncRow {
 }
 
 export interface SyncSummary {
-  created: number; // new court_events appended
-  hearings: number; // hearings upserted
-  triaged: number; // inbox items raised
+  created: number; // new activity rows appended
+  hearings: number; // hearing tasks upserted
+  triaged: number; // inbox (Triage-state) tasks raised
 }
 
 interface DerivedEvent {
@@ -28,9 +29,10 @@ interface DerivedEvent {
 }
 
 // The single writer: diff a normalized case against the matter's stored state and
-// land changes idempotently into the append-only court_events, upsert hearings,
-// update the matter projections, and raise triage items for material changes.
-// Re-syncing the same response is a no-op (content_hash uniqueness).
+// land changes idempotently into the append-only `activity` timeline, upsert
+// hearing tasks, update the matter projections, and raise Triage-state tasks
+// (the Inbox) for material changes. Re-syncing the same response is a no-op
+// (activity content_hash uniqueness + hearing read-then-write dedup).
 export async function syncMatter(
   supabase: DB,
   matter: MatterSyncRow,
@@ -74,22 +76,23 @@ export async function syncMatter(
     });
   }
 
-  // Append events idempotently; `.select()` returns ONLY newly-inserted rows
-  // (ON CONFLICT DO NOTHING), so triage fires once per genuinely-new change.
+  // Append activity rows idempotently; `.select()` returns ONLY newly-inserted
+  // rows (ON CONFLICT DO NOTHING), so triage fires once per genuinely-new change.
   let triaged = 0;
   let created = 0;
   if (derived.length) {
     const { data: inserted } = await supabase
-      .from("court_events")
+      .from("activity")
       .upsert(
         derived.map((e) => ({
           lawyer_id,
           matter_id,
+          kind: "court_event",
           event_type: e.event_type,
           previous_value: e.previous_value,
           new_value: e.new_value,
           occurred_at: e.occurred_at,
-          source_type: "ecourt",
+          source: "ecourt",
           content_hash: e.content_hash,
         })),
         { onConflict: "matter_id,content_hash", ignoreDuplicates: true },
@@ -97,32 +100,63 @@ export async function syncMatter(
       .select("content_hash");
     const freshHashes = new Set((inserted ?? []).map((r) => r.content_hash as string));
     created = freshHashes.size;
-    const triage = derived
-      .filter((e) => freshHashes.has(e.content_hash))
-      .map((e) => ({ lawyer_id, matter_id, kind: e.kind, summary: e.summary, state: "pending" }));
-    if (triage.length) {
-      await supabase.from("triage_items").insert(triage);
+
+    // Each genuinely-new change becomes a Triage-state task (the Inbox). Keyless;
+    // a key is minted on accept. triage_kind drives the Inbox KIND chip.
+    const triageId = await getSystemStateId(supabase, "Triage");
+    const triage = derived.filter((e) => freshHashes.has(e.content_hash));
+    if (triage.length && triageId) {
+      await supabase.from("tasks").insert(
+        triage.map((e) => ({
+          lawyer_id,
+          matter_id,
+          type: "task",
+          state_id: triageId,
+          title: e.summary,
+          source: "triage",
+          attributes: { triage_kind: e.kind },
+        })),
+      );
       triaged = triage.length;
     }
   }
 
-  // Upsert hearings (idempotent on matter_id+hearing_date+ordinal). The API
-  // history has no outcome field, so derive held/scheduled from the date.
+  // Hearing tasks: read-then-write dedup on due_date (no jsonb upsert). Existing
+  // dates get their court_state/purpose/outcome refreshed; new dates inserted.
+  // The API history has no outcome field, so derive held/scheduled from the date.
   if (c.hearings.length) {
     const today = now.slice(0, 10);
-    await supabase.from("hearings").upsert(
-      c.hearings.map((h) => ({
-        lawyer_id,
-        matter_id,
-        hearing_date: h.hearing_date,
-        purpose: h.purpose,
-        outcome: h.outcome,
-        source: "ecourt",
-        state: h.hearing_date < today ? "held" : "scheduled",
-        ordinal: 0,
-      })),
-      { onConflict: "matter_id,hearing_date,ordinal", ignoreDuplicates: false },
-    );
+    const { data: existing } = await supabase
+      .from("tasks")
+      .select("id, due_date, attributes")
+      .eq("matter_id", matter_id)
+      .eq("type", "hearing");
+    const byDate = new Map((existing ?? []).map((h) => [h.due_date as string, h]));
+    const toInsert: Record<string, unknown>[] = [];
+    for (const h of c.hearings) {
+      const court_state = h.hearing_date < today ? "held" : "scheduled";
+      const found = byDate.get(h.hearing_date);
+      if (found) {
+        const attributes = {
+          ...((found.attributes as Record<string, unknown>) ?? {}),
+          purpose: h.purpose,
+          outcome: h.outcome,
+          court_state,
+        };
+        await supabase.from("tasks").update({ attributes }).eq("id", found.id as string);
+      } else {
+        toInsert.push({
+          lawyer_id,
+          matter_id,
+          type: "hearing",
+          title: h.purpose ?? "Hearing",
+          due_date: h.hearing_date,
+          source: "sync",
+          attributes: { purpose: h.purpose, outcome: h.outcome, court_state },
+        });
+      }
+    }
+    if (toInsert.length) await supabase.from("tasks").insert(toInsert);
   }
 
   // Update matter projections (court_status/next-hearing are eCourts-owned; the
@@ -134,7 +168,6 @@ export async function syncMatter(
       next_hearing_date: c.next_hearing_date ?? matter.next_hearing_date,
       lifecycle_state: c.lifecycle_hint,
       last_successful_sync_at: now,
-      last_event_at: now,
     })
     .eq("id", matter_id);
 

@@ -3,8 +3,8 @@ import { FlaskConical } from "lucide-react";
 import { Callout } from "@/components/layout";
 
 // Shown app-wide while "See it in action" sample data is loaded, so the lawyer
-// can never mistake seeded matters/court events for their real, synced data.
-// (Seeded court_events carry source_type "ecourt", so without this banner they
+// can never mistake seeded matters/activity for their real, synced data.
+// (Seeded activity rows carry source "ecourt", so without this banner they
 // render identically to a genuine eCourts sync.)
 export function SampleDataBanner() {
   return (

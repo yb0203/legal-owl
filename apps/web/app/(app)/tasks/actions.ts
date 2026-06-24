@@ -25,10 +25,11 @@ export async function createQuickTask(formData: FormData) {
     .maybeSingle();
   if (!todo) return;
 
-  await supabase.from("actions").insert({
+  await supabase.from("tasks").insert({
     lawyer_id: user.id,
     matter_id: matterId,
-    key: await nextKey(supabase, "actions", "ACT-"),
+    type: "task",
+    key: await nextKey(supabase, "tasks", "T-"),
     title,
     state_id: todo.id,
     priority: String(formData.get("priority") || "none"),
