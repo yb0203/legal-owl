@@ -42,10 +42,20 @@ Architecture & conventions:
   using the session pooler (URL-encode the DB password with `safe=''` — a literal `/` in it
   otherwise breaks URL parsing). Private Storage bucket `case-documents` holds uploaded files at path
   `${lawyer_id}/${matter_id}/<file>`. Outbound email goes through **Resend** (`lib/email.ts`).
-- **Domain hierarchy: Client → Engagement → Matter → Action** (a "General" engagement is
-  auto-created per client). Matter is the case file (internal id + optional CNR); Action is the
-  task. Hearings, Deadlines, Documents, append-only `court_events` + immutable `remarks` (merged at
-  read time into the timeline), and `triage_items` (the Inbox) all hang off Matter.
+- **Domain hierarchy: Client → Matter → Task** (task-first model, Linear-inspired). Matter is the
+  case file (internal id + optional CNR). The unified **`tasks`** table (`type: task | hearing |
+  deadline`, shared columns + a JSONB `attributes` bag for type-specific legal fields) replaces the
+  old actions/hearings/deadlines/triage tables — hearings and deadlines are just typed tasks with a
+  date. The **Inbox is tasks parked in the system `Triage` state** (accept → To-Do, dismiss →
+  Cancelled, snooze → `snoozed_until`); `state_id` is nullable (hearings/deadlines carry none), so
+  every task read that feeds a status badge filters `type='task'`. Append-only **`activity`** (one
+  immutable timeline: synced `court_event` rows keyed by `unique(matter_id, content_hash)` + your
+  `remark` notes, immutability trigger scoped to `kind='remark'`) replaces court_events+remarks.
+  **`taggings`** is one polymorphic label join (`target_type: task | matter`, no FK on `target_id`).
+  `task_relations` replaces action_relations. Documents and `conflict_flags` still hang off Matter.
+  Engagements were dropped. A Vercel Chat SDK-aligned `conversations`+`messages` foundation exists
+  (UIMessage `parts`/`metadata` jsonb) but has no UI yet. The single eCourts sync coupling point is
+  `lib/ecourts/sync.ts`.
 - **UI: shadcn on the Base UI registry (NOT Radix).** `components.json` style is `base-nova`,
   base color `neutral`, icons `lucide`. Components use the `render` prop, not `asChild`; Base UI
   `Button`/menu items default to `type="button"` (always set `type="submit"` on form buttons). Add
