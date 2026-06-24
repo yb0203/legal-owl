@@ -6,9 +6,8 @@ import { ArrowRight, Sparkles } from "lucide-react";
 // stays clean. Links into the deepened Help glossary.
 const STEPS = [
   { term: "Client", meaning: "who you act for" },
-  { term: "Engagement", meaning: "a body of work for them" },
   { term: "Matter", meaning: "a single case file" },
-  { term: "Action", meaning: "a task on that matter" },
+  { term: "Task", meaning: "anything to do, hear, or watch" },
 ] as const;
 
 export function ModelOrientation({ className }: { className?: string }) {
@@ -38,8 +37,8 @@ export function ModelOrientation({ className }: { className?: string }) {
       </ol>
 
       <p className="mt-4 text-sm text-muted-foreground">
-        Hearings, deadlines, documents, and the court Inbox all hang off a Matter — the case
-        file everything lands on.
+        Hearings and deadlines are just tasks with a date; court updates arrive as tasks in your
+        Inbox. Everything hangs off a Matter — the case file it all lands on.
       </p>
 
       <Link

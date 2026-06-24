@@ -35,17 +35,6 @@ export function CommandPalette({ matters = [] }: { matters?: MatterLite[] }) {
   const [recents, setRecents] = React.useState<MatterLite[]>([]);
   const router = useRouter();
 
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((o) => !o);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
   // Refresh the recents list each time the palette opens.
   React.useEffect(() => {
     if (open) setRecents(readRecents());
@@ -75,9 +64,6 @@ export function CommandPalette({ matters = [] }: { matters?: MatterLite[] }) {
       >
         <Search className="size-4" />
         <span className="hidden sm:inline">Search…</span>
-        <kbd className="tnum ml-1 hidden rounded bg-muted px-1.5 text-[10px] font-medium sm:inline">
-          ⌘K
-        </kbd>
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>

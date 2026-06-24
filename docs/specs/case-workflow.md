@@ -1,9 +1,19 @@
 ---
 date: 2026-06-21
 topic: case-workflow
+superseded_by: task-first re-model (2026-06-24)
 ---
 
 # Case Workflow — Requirements
+
+> **Superseded (2026-06-24).** This captures the original requirements as decided on 2026-06-21 and
+> is kept for history. The data model has since been re-modelled: **Action**, **Hearing**,
+> **Deadline**, and **TriageItem** are now one **`tasks`** table (`type: task | hearing | deadline`,
+> nullable `state_id`, JSONB `attributes`); the Inbox is tasks in the system `Triage` state.
+> **CourtEvent** + **Remark** are now one append-only **`activity`** table (`matters.last_event_at`
+> removed). The product behaviour described below still holds; only the table shapes changed. Current
+> source of truth: `CLAUDE.md` → "Domain hierarchy" and
+> `supabase/migrations/20260624000001_task_first_model.sql`.
 
 ## Summary
 

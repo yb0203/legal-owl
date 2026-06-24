@@ -30,11 +30,13 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/native-select";
+import { NewBadge } from "@/components/new-badge";
 
 export interface TriageRowItem {
   id: string;
   summary: string;
   kindLabel: string;
+  createdAt?: string;
   matter: { id: string; title: string; key: string } | null;
 }
 
@@ -94,8 +96,11 @@ export function TriageRow({ item }: { item: TriageRowItem }) {
   return (
     <li className="rounded-xl border bg-card p-4">
       <div className="min-w-0">
-        <span className="rounded bg-lemon/15 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-          {item.kindLabel}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded bg-lemon/15 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
+            {item.kindLabel}
+          </span>
+          <NewBadge createdAt={item.createdAt} />
         </span>
         <p className="mt-1.5 text-sm font-medium">{item.summary}</p>
         {item.matter && (

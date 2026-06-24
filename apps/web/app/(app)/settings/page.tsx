@@ -2,6 +2,7 @@ import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/login/actions";
 import { DemoToggle } from "@/components/demo-toggle";
+import { SyncAllButton } from "@/components/settings/sync-all-button";
 import { ProfileForm, type ProfileValues } from "@/components/settings/profile-form";
 import { PageHeader, SectionCard } from "@/components/page-header";
 import { PageShell } from "@/components/layout";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
+  const ecourtsConfigured = !!process.env.ECOURTS_API_KEY;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -53,11 +55,11 @@ export default async function SettingsPage() {
         <SectionCard title="eCourts connection">
           <div className="flex items-center justify-between gap-4 p-4">
             <p className="text-sm text-muted-foreground">
-              Connect your eCourts access to sync case status, orders and hearing dates automatically.
+              {ecourtsConfigured
+                ? "Matters with a CNR sync from eCourts automatically each night — pull updates now any time."
+                : "Connect your eCourts access to sync case status, orders and hearing dates automatically."}
             </p>
-            <Button type="button" variant="outline" size="sm" disabled>
-              Connect — soon
-            </Button>
+            <SyncAllButton configured={ecourtsConfigured} />
           </div>
         </SectionCard>
 

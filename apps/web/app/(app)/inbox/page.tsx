@@ -1,13 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSystemStateId } from "@/lib/db";
 import { PageHeader, EmptyState } from "@/components/page-header";
 import { PageShell } from "@/components/layout";
 import { HelpLink } from "@/components/help/help-link";
 import { TriageRow, type TriageRowItem } from "@/components/inbox/triage-row";
+import type { TaskAttributes } from "@/lib/types";
 
 interface Row {
   id: string;
-  kind: string;
-  summary: string;
+  title: string;
+  attributes: TaskAttributes;
+  created_at: string;
   matter: { id: string; title: string; key: string } | null;
 }
 
@@ -20,21 +23,28 @@ const KIND_LABELS: Record<string, string> = {
 export default async function InboxPage() {
   const supabase = await createClient();
   const now = new Date().toISOString();
+  const triageId = await getSystemStateId(supabase, "Triage");
 
+  // Inbox = type='task' rows parked in the Triage state (minus snoozed).
   const { data: rows } = await supabase
-    .from("triage_items")
-    .select("id, kind, summary, matter:matters(id, title, key)")
-    .eq("state", "pending")
+    .from("tasks")
+    .select("id, title, attributes, created_at, matter:matters(id, title, key)")
+    .eq("type", "task")
+    .eq("state_id", triageId ?? "")
     .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
     .order("created_at", { ascending: false })
     .returns<Row[]>();
 
-  const items: TriageRowItem[] = (rows ?? []).map((r) => ({
-    id: r.id,
-    summary: r.summary,
-    kindLabel: KIND_LABELS[r.kind] ?? r.kind,
-    matter: r.matter,
-  }));
+  const items: TriageRowItem[] = (rows ?? []).map((r) => {
+    const kind = r.attributes?.triage_kind ?? "";
+    return {
+      id: r.id,
+      summary: r.title,
+      kindLabel: KIND_LABELS[kind] ?? kind ?? "Update",
+      createdAt: r.created_at,
+      matter: r.matter,
+    };
+  });
 
   return (
     <PageShell>

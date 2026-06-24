@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirect";
-import { nextKey, ensureGeneralEngagement } from "@/lib/db";
+import { nextKey } from "@/lib/db";
+import { syncOneMatter } from "@/lib/ecourts/run";
 
 export async function createMatter(formData: FormData) {
   const supabase = await createClient();
@@ -21,9 +22,6 @@ export async function createMatter(formData: FormData) {
       .filter(Boolean);
 
   const clientId = String(formData.get("client_id") || "") || null;
-  const engagementId = clientId
-    ? await ensureGeneralEngagement(supabase, lawyer_id, clientId)
-    : null;
 
   const firstHearing = String(formData.get("first_hearing_date") || "") || null;
 
@@ -37,7 +35,6 @@ export async function createMatter(formData: FormData) {
       case_type: String(formData.get("case_type") || "").trim() || null,
       cnr: String(formData.get("cnr") || "").trim() || null,
       client_id: clientId,
-      engagement_id: engagementId,
       parties: {
         petitioners: split(formData.get("petitioners")),
         respondents: split(formData.get("respondents")),
@@ -50,14 +47,35 @@ export async function createMatter(formData: FormData) {
   if (error) redirectWithError("/matters/new", error.message);
 
   if (firstHearing && inserted) {
-    await supabase.from("hearings").insert({
+    await supabase.from("tasks").insert({
       lawyer_id,
       matter_id: inserted.id,
-      hearing_date: firstHearing,
-      purpose: "First hearing",
-      source: "lawyer_manual",
-      state: "scheduled",
+      type: "hearing",
+      title: "First hearing",
+      due_date: firstHearing,
+      source: "manual",
+      attributes: { purpose: "First hearing", court_state: "scheduled" },
     });
+  }
+
+  // Connect-by-CNR (U5): if a CNR was given, do a first sync to backfill the
+  // timeline + projections (best-effort — never block matter creation on it).
+  const cnr = String(formData.get("cnr") || "").trim() || null;
+  if (cnr && inserted) {
+    await supabase
+      .from("matters")
+      .update({ lifecycle_state: "pending_first_sync" })
+      .eq("id", inserted.id);
+    try {
+      const { data: m } = await supabase
+        .from("matters")
+        .select("id, lawyer_id, cnr, court_status, next_hearing_date")
+        .eq("id", inserted.id)
+        .single();
+      if (m) await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1]);
+    } catch {
+      /* sync is best-effort; the lawyer can retry via Sync now */
+    }
   }
 
   revalidatePath("/matters");

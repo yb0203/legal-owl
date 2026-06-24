@@ -22,7 +22,7 @@ export default function HelpPage() {
         ))}
 
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          Still stuck? Use the in-app search (<kbd className="rounded bg-muted px-1 text-xs">⌘K</kbd>) to jump anywhere
+          Still stuck? Use the Search box in the header to jump anywhere
           <ArrowRight className="size-3.5" />
         </p>
       </div>

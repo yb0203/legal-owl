@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatterStatusControl } from "@/components/matter/matter-status";
+import { SyncNowButton } from "@/components/matter/sync-now-button";
 import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
 import { CopyChip } from "@/components/matter/copy-chip";
 import { ConfirmDeleteDocument } from "@/components/matter/confirm-delete-document";
@@ -32,7 +33,18 @@ import { LabelPicker } from "@/components/label-picker";
 import { PageShell, Panel, List, ListRow, Tag, BackLink } from "@/components/layout";
 import { NativeSelect } from "@/components/native-select";
 import { loadLabels } from "@/app/(app)/labels/actions";
-import type { Label } from "@/lib/types";
+import type { Label, ActivityRow, EventSource, TaskAttributes } from "@/lib/types";
+
+interface HearingTaskRow {
+  id: string;
+  due_date: string | null;
+  attributes: TaskAttributes;
+}
+interface DeadlineTaskRow {
+  id: string;
+  due_date: string | null;
+  attributes: TaskAttributes;
+}
 import {
   addRemark,
   addHearing,
@@ -80,7 +92,6 @@ interface MatterDetail {
   next_hearing_date: string | null;
   archived_at: string | null;
   client: { id: string; display_name: string } | null;
-  engagement: { id: string; name: string } | null;
 }
 
 export default async function MatterDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -90,7 +101,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const { data: matterRow } = await supabase
     .from("matters")
     .select(
-      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, client:clients(id, display_name), engagement:engagements(id, name)",
+      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, client:clients(id, display_name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -98,8 +109,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const matter = matterRow as unknown as MatterDetail;
 
   const [
-    { data: events },
-    { data: remarks },
+    { data: activityRows },
     { data: tasks },
     { data: hearings },
     { data: deadlines },
@@ -108,14 +118,13 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
     { data: matterLabels },
     allLabels,
   ] = await Promise.all([
-    supabase.from("court_events").select("id, event_type, new_value, occurred_at, detected_at, source_type").eq("matter_id", id),
-    supabase.from("remarks").select("id, body, created_at").eq("matter_id", id),
-    supabase.from("actions").select("id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type)").eq("matter_id", id).order("created_at", { ascending: true }).returns<TaskRow[]>(),
-    supabase.from("hearings").select("id, hearing_date, purpose, outcome, state").eq("matter_id", id).order("hearing_date", { ascending: false }),
-    supabase.from("deadlines").select("id, type, due_date, basis").eq("matter_id", id).order("due_date", { ascending: true }),
+    supabase.from("activity").select("id, kind, event_type, body, new_value, source, occurred_at, created_at").eq("matter_id", id).order("occurred_at", { ascending: false }).returns<ActivityRow[]>(),
+    supabase.from("tasks").select("id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type)").eq("matter_id", id).eq("type", "task").order("created_at", { ascending: true }).returns<TaskRow[]>(),
+    supabase.from("tasks").select("id, due_date, attributes").eq("matter_id", id).eq("type", "hearing").order("due_date", { ascending: false }).returns<HearingTaskRow[]>(),
+    supabase.from("tasks").select("id, due_date, attributes").eq("matter_id", id).eq("type", "deadline").order("due_date", { ascending: true }).returns<DeadlineTaskRow[]>(),
     supabase.from("documents").select("id, name, source, uploaded_at, storage_path").eq("matter_id", id).order("uploaded_at", { ascending: false }),
     supabase.from("workflow_states").select("id, name, type, position").is("lawyer_id", null).order("position").returns<WorkflowState[]>(),
-    supabase.from("matter_labels").select("label:labels(id, name, color)").eq("matter_id", id).returns<{ label: Label | null }[]>(),
+    supabase.from("taggings").select("label:labels(id, name, color)").eq("target_type", "matter").eq("target_id", id).returns<{ label: Label | null }[]>(),
     loadLabels(),
   ]);
 
@@ -125,34 +134,37 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const taskIds = (tasks ?? []).map((t) => t.id);
   const { data: taskLabelRows } = taskIds.length
     ? await supabase
-        .from("action_labels")
-        .select("action_id, label:labels(id, name, color)")
-        .in("action_id", taskIds)
-        .returns<{ action_id: string; label: Label | null }[]>()
-    : { data: [] as { action_id: string; label: Label | null }[] };
+        .from("taggings")
+        .select("target_id, label:labels(id, name, color)")
+        .eq("target_type", "task")
+        .in("target_id", taskIds)
+        .returns<{ target_id: string; label: Label | null }[]>()
+    : { data: [] as { target_id: string; label: Label | null }[] };
   const taskLabels: Record<string, Label[]> = {};
   for (const r of taskLabelRows ?? []) {
-    if (r.label) (taskLabels[r.action_id] ??= []).push(r.label);
+    if (r.label) (taskLabels[r.target_id] ??= []).push(r.label);
   }
 
-  type TL = { kind: "event" | "remark"; key: string; at: string; label: string; source: "ecourt" | "lawyer_manual" | "system"; body?: string };
-  const timeline: TL[] = [
-    ...(events ?? []).map((e): TL => ({
-      kind: "event",
-      key: `e-${e.id}`,
-      at: e.occurred_at ?? e.detected_at,
-      label: (EVENT_LABELS[e.event_type] ?? e.event_type) + (e.new_value ? `: ${e.new_value}` : ""),
-      source: e.source_type,
-    })),
-    ...(remarks ?? []).map((r): TL => ({
-      kind: "remark",
-      key: `r-${r.id}`,
-      at: r.created_at,
-      label: "Remark",
-      source: "lawyer_manual",
-      body: r.body,
-    })),
-  ].sort((a, b) => (a.at < b.at ? 1 : -1));
+  // Single immutable timeline (court events + remarks merged at the source).
+  type TL = { kind: "event" | "remark"; key: string; at: string; label: string; source: EventSource; body?: string };
+  const timeline: TL[] = (activityRows ?? []).map((a): TL =>
+    a.kind === "remark"
+      ? {
+          kind: "remark",
+          key: `r-${a.id}`,
+          at: a.occurred_at ?? a.created_at,
+          label: "Remark",
+          source: a.source,
+          body: a.body ?? "",
+        }
+      : {
+          kind: "event",
+          key: `e-${a.id}`,
+          at: a.occurred_at ?? a.created_at,
+          label: (EVENT_LABELS[a.event_type ?? ""] ?? a.event_type ?? "Update") + (a.new_value ? `: ${a.new_value}` : ""),
+          source: a.source,
+        },
+  );
 
   const parties = matter.parties ?? {};
   const petitioners = parties.petitioners ?? [];
@@ -201,7 +213,6 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
       value: matter.client ? (
         <Link href={`/clients/${matter.client.id}`} className="text-foreground hover:underline">
           {matter.client.display_name}
-          {matter.engagement && matter.engagement.name !== "General" ? ` · ${matter.engagement.name}` : ""}
         </Link>
       ) : null,
     },
@@ -252,7 +263,10 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
             <div className="mt-4 border-t pt-4">
               <div className="mb-2 text-xs text-muted-foreground">Actions</div>
-              <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
+              <div className="flex flex-wrap items-center gap-2">
+                <MatterStatusControl matterId={matter.id} status={matter.matter_status} archived={!!matter.archived_at} />
+                <SyncNowButton matterId={matter.id} hasCnr={!!matter.cnr} />
+              </div>
             </div>
           </Panel>
         </aside>
@@ -319,15 +333,15 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
                 <li key={h.id} className="rounded-lg border bg-card px-4 py-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate font-medium">{h.purpose ?? "Hearing"}</div>
-                      {h.outcome && <div className="text-xs text-muted-foreground">{h.outcome}</div>}
+                      <div className="truncate font-medium">{h.attributes?.purpose ?? "Hearing"}</div>
+                      {h.attributes?.outcome && <div className="text-xs text-muted-foreground">{h.attributes.outcome}</div>}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="tnum text-sm font-semibold">{fmtDate(h.hearing_date)}</span>
-                      <Tag className="capitalize">{h.state}</Tag>
+                      <span className="tnum text-sm font-semibold">{h.due_date ? fmtDate(h.due_date) : "—"}</span>
+                      <Tag className="capitalize">{h.attributes?.court_state ?? "scheduled"}</Tag>
                     </div>
                   </div>
-                  {h.state === "scheduled" && (
+                  {(h.attributes?.court_state ?? "scheduled") === "scheduled" && (
                     <form action={setHearingOutcome} className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
                       <input type="hidden" name="hearing_id" value={h.id} />
                       <input type="hidden" name="matter_id" value={id} />
@@ -362,15 +376,18 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
             <EmptyState title="No deadlines" hint="Statutory and limitation dates are computed by rule, never guessed." />
           ) : (
             <List>
-              {deadlines!.map((d) => (
-                <ListRow key={d.id} className="justify-between text-sm">
-                  <div>
-                    <Tag>{DEADLINE_LABELS[d.type] ?? d.type}</Tag>
-                    {d.basis && <span className="ml-2 text-muted-foreground">{d.basis}</span>}
-                  </div>
-                  <span className="tnum shrink-0 text-sm font-medium">{fmtDateYear(d.due_date)}</span>
-                </ListRow>
-              ))}
+              {deadlines!.map((d) => {
+                const dtype = d.attributes?.deadline_type ?? "internal";
+                return (
+                  <ListRow key={d.id} className="justify-between text-sm">
+                    <div>
+                      <Tag>{DEADLINE_LABELS[dtype] ?? dtype}</Tag>
+                      {d.attributes?.basis && <span className="ml-2 text-muted-foreground">{d.attributes.basis}</span>}
+                    </div>
+                    <span className="tnum shrink-0 text-sm font-medium">{d.due_date ? fmtDateYear(d.due_date) : "—"}</span>
+                  </ListRow>
+                );
+              })}
             </List>
           )}
         </TabsContent>

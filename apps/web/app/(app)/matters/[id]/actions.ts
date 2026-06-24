@@ -4,6 +4,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nextKey } from "@/lib/db";
+import { syncOneMatter, type RunResult } from "@/lib/ecourts/run";
+
+// "Sync now" — fetch the matter's CNR from eCourts and diff into its timeline.
+export async function syncMatterNow(matterId: string): Promise<RunResult> {
+  const { supabase, user } = await authed();
+  if (!user) return { ok: false, reason: "unauthorized" };
+  const { data: m } = await supabase
+    .from("matters")
+    .select("id, lawyer_id, cnr, court_status, next_hearing_date")
+    .eq("id", matterId)
+    .maybeSingle();
+  if (!m) return { ok: false, reason: "error" };
+  const r = await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1]);
+  revalidatePath(`/matters/${matterId}`);
+  return r;
+}
 
 async function authed() {
   const supabase = await createClient();
@@ -20,16 +36,17 @@ async function recomputeNextHearing(
 ) {
   const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase
-    .from("hearings")
-    .select("hearing_date")
+    .from("tasks")
+    .select("due_date")
     .eq("matter_id", matterId)
-    .eq("state", "scheduled")
-    .gte("hearing_date", today)
-    .order("hearing_date", { ascending: true })
+    .eq("type", "hearing")
+    .eq("attributes->>court_state", "scheduled")
+    .gte("due_date", today)
+    .order("due_date", { ascending: true })
     .limit(1);
   await supabase
     .from("matters")
-    .update({ next_hearing_date: data?.[0]?.hearing_date ?? null })
+    .update({ next_hearing_date: data?.[0]?.due_date ?? null })
     .eq("id", matterId);
 }
 
@@ -39,7 +56,14 @@ export async function addRemark(formData: FormData) {
   if (!matterId || !body) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase.from("remarks").insert({ lawyer_id: user.id, matter_id: matterId, body });
+  await supabase.from("activity").insert({
+    lawyer_id: user.id,
+    matter_id: matterId,
+    kind: "remark",
+    body,
+    source: "lawyer_manual",
+    occurred_at: new Date().toISOString(),
+  });
   revalidatePath(`/matters/${matterId}`);
 }
 
@@ -102,10 +126,11 @@ export async function createTask(formData: FormData) {
     .eq("name", "To-Do")
     .single();
 
-  await supabase.from("actions").insert({
+  await supabase.from("tasks").insert({
     lawyer_id: user.id,
     matter_id: matterId,
-    key: await nextKey(supabase, "actions", "ACT-"),
+    type: "task",
+    key: await nextKey(supabase, "tasks", "T-"),
     title,
     state_id: todo!.id,
     priority: String(formData.get("priority") || "none"),
@@ -125,7 +150,7 @@ export async function toggleTask(taskId: string, makeComplete: boolean) {
     .eq("name", makeComplete ? "Done" : "To-Do")
     .single();
   await supabase
-    .from("actions")
+    .from("tasks")
     .update({
       state_id: target!.id,
       completed_at: makeComplete ? new Date().toISOString() : null,
@@ -144,7 +169,7 @@ export async function updateTaskState(taskId: string, stateId: string) {
     .single();
   const done = st?.type === "completed" || st?.type === "cancelled";
   await supabase
-    .from("actions")
+    .from("tasks")
     .update({ state_id: stateId, completed_at: done ? new Date().toISOString() : null })
     .eq("id", taskId);
   revalidatePath("/", "layout");
@@ -153,16 +178,16 @@ export async function updateTaskState(taskId: string, stateId: string) {
 export async function updateTaskPriority(taskId: string, priority: string) {
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase.from("actions").update({ priority }).eq("id", taskId);
+  await supabase.from("tasks").update({ priority }).eq("id", taskId);
   revalidatePath("/", "layout");
 }
 
-// ── Task dependencies (action_relations) ─────────────────────────────────────
+// ── Task dependencies (task_relations) ───────────────────────────────────────
 // A single canonical row per relation; the inverse direction is computed at read
 // time. Relations are scoped to tasks within the same matter (no cross-matter).
 export type TaskRelationRow = {
   id: string;
-  action_id: string;
+  task_id: string;
   related_id: string;
   kind: "blocks" | "blocked_by" | "related";
 };
@@ -172,49 +197,49 @@ export async function loadTaskRelations(matterId: string): Promise<TaskRelationR
   const { supabase, user } = await authed();
   if (!user) return [];
   // Tasks belonging to this matter (RLS already scopes to the lawyer).
-  const { data: tasks } = await supabase.from("actions").select("id").eq("matter_id", matterId);
+  const { data: tasks } = await supabase.from("tasks").select("id").eq("matter_id", matterId).eq("type", "task");
   const ids = (tasks ?? []).map((t) => t.id);
   if (ids.length === 0) return [];
   const { data } = await supabase
-    .from("action_relations")
-    .select("id, action_id, related_id, kind")
-    .in("action_id", ids)
+    .from("task_relations")
+    .select("id, task_id, related_id, kind")
+    .in("task_id", ids)
     .returns<TaskRelationRow[]>();
   return data ?? [];
 }
 
 export async function addTaskRelation(formData: FormData) {
   const matterId = String(formData.get("matter_id"));
-  const actionId = String(formData.get("action_id"));
+  const taskId = String(formData.get("task_id"));
   const relatedId = String(formData.get("related_id"));
   const kind = String(formData.get("kind") || "");
-  if (!matterId || !actionId || !relatedId || !kind) return;
-  if (actionId === relatedId) return; // a task cannot relate to itself
+  if (!matterId || !taskId || !relatedId || !kind) return;
+  if (taskId === relatedId) return; // a task cannot relate to itself
   if (kind !== "blocks" && kind !== "blocked_by" && kind !== "related") return;
   const { supabase, user } = await authed();
   if (!user) return;
 
   // Both tasks must live in this matter (no cross-matter linking in this slice).
   const { data: scoped } = await supabase
-    .from("actions")
+    .from("tasks")
     .select("id")
     .eq("matter_id", matterId)
-    .in("id", [actionId, relatedId]);
+    .in("id", [taskId, relatedId]);
   if ((scoped ?? []).length !== 2) return;
 
-  // Prevent duplicate (action_id, related_id, kind).
+  // Prevent duplicate (task_id, related_id, kind).
   const { data: existing } = await supabase
-    .from("action_relations")
+    .from("task_relations")
     .select("id")
-    .eq("action_id", actionId)
+    .eq("task_id", taskId)
     .eq("related_id", relatedId)
     .eq("kind", kind)
     .limit(1);
   if ((existing ?? []).length > 0) return;
 
   await supabase
-    .from("action_relations")
-    .insert({ lawyer_id: user.id, action_id: actionId, related_id: relatedId, kind });
+    .from("task_relations")
+    .insert({ lawyer_id: user.id, task_id: taskId, related_id: relatedId, kind });
   revalidatePath(`/matters/${matterId}`);
 }
 
@@ -224,7 +249,7 @@ export async function removeTaskRelation(formData: FormData) {
   if (!relationId) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase.from("action_relations").delete().eq("id", relationId);
+  await supabase.from("task_relations").delete().eq("id", relationId);
   if (matterId) revalidatePath(`/matters/${matterId}`);
 }
 
@@ -234,13 +259,17 @@ export async function addHearing(formData: FormData) {
   if (!matterId || !date) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase.from("hearings").insert({
+  await supabase.from("tasks").insert({
     lawyer_id: user.id,
     matter_id: matterId,
-    hearing_date: date,
-    purpose: String(formData.get("purpose") || "").trim() || null,
-    source: "lawyer_manual",
-    state: "scheduled",
+    type: "hearing",
+    title: String(formData.get("purpose") || "").trim() || "Hearing",
+    due_date: date,
+    source: "manual",
+    attributes: {
+      purpose: String(formData.get("purpose") || "").trim() || null,
+      court_state: "scheduled",
+    },
   });
   await recomputeNextHearing(supabase, matterId);
   revalidatePath(`/matters/${matterId}`);
@@ -253,10 +282,18 @@ export async function setHearingOutcome(formData: FormData) {
   if (!hearingId || !matterId) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase
-    .from("hearings")
-    .update({ state, outcome: String(formData.get("outcome") || "").trim() || null })
-    .eq("id", hearingId);
+  // Merge into the hearing task's jsonb attributes (read-then-write).
+  const { data: row } = await supabase
+    .from("tasks")
+    .select("attributes")
+    .eq("id", hearingId)
+    .maybeSingle();
+  const attributes = {
+    ...((row?.attributes as Record<string, unknown>) ?? {}),
+    court_state: state,
+    outcome: String(formData.get("outcome") || "").trim() || null,
+  };
+  await supabase.from("tasks").update({ attributes }).eq("id", hearingId);
   await recomputeNextHearing(supabase, matterId);
   revalidatePath(`/matters/${matterId}`);
 }
@@ -290,14 +327,16 @@ export async function uploadDocument(formData: FormData) {
     await supabase.storage.from("case-documents").remove([path]);
     return;
   }
-  // Surface the upload on the matter timeline. content_hash is NOT NULL with a
-  // unique(matter_id, content_hash) constraint — key it to the unique storage path.
-  await supabase.from("court_events").insert({
+  // Surface the upload on the matter timeline. content_hash keys the
+  // unique(matter_id, content_hash) constraint — set it to the unique storage path.
+  await supabase.from("activity").insert({
     lawyer_id: user.id,
     matter_id: matterId,
+    kind: "system",
     event_type: "document_added",
     new_value: file.name,
-    source_type: "system",
+    source: "system",
+    occurred_at: new Date().toISOString(),
     content_hash: `document_added:${path}`,
   });
   revalidatePath(`/matters/${matterId}`);
@@ -324,12 +363,14 @@ export async function deleteDocument(formData: FormData) {
   const { error: delError } = await supabase.from("documents").delete().eq("id", docId);
   if (delError) return;
   if (path) await supabase.storage.from("case-documents").remove([path]);
-  await supabase.from("court_events").insert({
+  await supabase.from("activity").insert({
     lawyer_id: user.id,
     matter_id: matterId,
+    kind: "system",
     event_type: "document_removed",
     new_value: name || null,
-    source_type: "system",
+    source: "system",
+    occurred_at: new Date().toISOString(),
     content_hash: `document_removed:${docId}:${Date.now()}`,
   });
   revalidatePath(`/matters/${matterId}`);
@@ -341,12 +382,18 @@ export async function addDeadline(formData: FormData) {
   if (!matterId || !date) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  await supabase.from("deadlines").insert({
+  const deadlineType = String(formData.get("type") || "internal");
+  await supabase.from("tasks").insert({
     lawyer_id: user.id,
     matter_id: matterId,
-    type: String(formData.get("type") || "internal"),
+    type: "deadline",
+    title: String(formData.get("basis") || "").trim() || `${deadlineType[0].toUpperCase()}${deadlineType.slice(1)} deadline`,
     due_date: date,
-    basis: String(formData.get("basis") || "").trim() || null,
+    source: "manual",
+    attributes: {
+      deadline_type: deadlineType,
+      basis: String(formData.get("basis") || "").trim() || null,
+    },
   });
   revalidatePath(`/matters/${matterId}`);
 }

@@ -17,36 +17,41 @@ export async function getSystemWorkflowStates(
 // Shared, reusable data helpers. These take the request-scoped (authed) Supabase
 // client so RLS applies — they are NOT server actions themselves.
 
-/** Sequential human key like M-7 / ACT-12, scoped to the lawyer via RLS. */
+/**
+ * Sequential human key like M-7 / T-12, scoped to the lawyer via RLS. For tasks,
+ * count only rows that already carry a key (`type='task'` + non-null key) — NOT
+ * all type='task' rows. Triage/hearing/deadline rows are type='task' but keyless,
+ * and accepting a Triage item mints a key in place (no new row), so counting all
+ * task rows would over- or under-count and re-mint an existing T-N, tripping
+ * unique(lawyer_id, key). Counting keyed rows keeps the sequence dense.
+ */
 export async function nextKey(
   supabase: SupabaseClient,
-  table: "matters" | "actions",
+  table: "matters" | "tasks",
   prefix: string,
 ): Promise<string> {
-  const { count } = await supabase.from(table).select("id", { count: "exact", head: true });
+  let query = supabase.from(table).select("id", { count: "exact", head: true });
+  if (table === "tasks") query = query.eq("type", "task").not("key", "is", null);
+  const { count } = await query;
   return `${prefix}${(count ?? 0) + 1}`;
 }
 
-/** Every client gets a default "General" engagement; create it if missing. */
-export async function ensureGeneralEngagement(
+/**
+ * Resolve a system workflow state id by name (lawyer_id null). Used to park
+ * synced updates in the fixed 'Triage' state (the Inbox) and to accept/dismiss
+ * by moving to 'To-Do' / 'Cancelled'.
+ */
+export async function getSystemStateId(
   supabase: SupabaseClient,
-  lawyerId: string,
-  clientId: string,
-): Promise<string> {
-  const { data: existing } = await supabase
-    .from("engagements")
-    .select("id")
-    .eq("client_id", clientId)
-    .eq("name", "General")
-    .maybeSingle();
-  if (existing) return existing.id as string;
-
+  name: string,
+): Promise<string | null> {
   const { data } = await supabase
-    .from("engagements")
-    .insert({ lawyer_id: lawyerId, client_id: clientId, name: "General" })
+    .from("workflow_states")
     .select("id")
-    .single();
-  return data!.id as string;
+    .is("lawyer_id", null)
+    .eq("name", name)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
 }
 
 function normalize(name: string): string {

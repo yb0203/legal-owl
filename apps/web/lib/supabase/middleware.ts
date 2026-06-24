@@ -44,9 +44,16 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/auth");
 
   // Unauthenticated users can only see public pages (landing, login, waitlist).
+  // In dev, bounce to the auto-login route instead of /login so localhost is
+  // authenticated by default (DEV_LOGIN_EMAIL, .env.local only — inert in prod).
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    if (process.env.NODE_ENV === "development" && process.env.DEV_LOGIN_EMAIL) {
+      url.pathname = "/auth/dev-login";
+      url.searchParams.set("next", request.nextUrl.pathname);
+    } else {
+      url.pathname = "/login";
+    }
     return NextResponse.redirect(url);
   }
 

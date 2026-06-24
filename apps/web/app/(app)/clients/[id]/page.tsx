@@ -7,16 +7,14 @@ import {
   FORUM_LABELS,
   type Client,
   type Contact,
-  type Engagement,
   type ForumType,
 } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
 import { HearingPill } from "@/components/badges";
 import { SectionCard, EmptyState } from "@/components/page-header";
-import { PageShell, SectionHeading, List, ListRow, Callout, Tag, BackLink } from "@/components/layout";
+import { PageShell, SectionHeading, List, ListRow, Callout, BackLink } from "@/components/layout";
 import { PropertiesRail, type PropertyRow } from "@/components/record/properties-rail";
 import { AttributeValue } from "@/components/record/attribute-value";
-import { RuleHint } from "@/components/record/rule-hint";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addContact, dismissConflict } from "./actions";
@@ -50,17 +48,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   if (!clientRow) notFound();
   const client = clientRow as Client;
 
-  const [{ data: contacts }, { data: engagements }, { data: matters }, { data: flags }] =
+  const [{ data: contacts }, { data: matters }, { data: flags }] =
     await Promise.all([
       supabase.from("contacts").select("id, client_id, name, role, email, phone").eq("client_id", id).returns<Contact[]>(),
-      supabase.from("engagements").select("id, client_id, name, scope_note, status, created_at").eq("client_id", id).returns<Engagement[]>(),
       supabase.from("matters").select("id, key, title, forum_type, next_hearing_date").eq("client_id", id).order("next_hearing_date", { ascending: true, nullsFirst: false }).returns<MatterLite[]>(),
       supabase.from("conflict_flags").select("id, matched_name, note, matter_id").eq("client_id", id).eq("status", "open").returns<ConflictFlag[]>(),
     ]);
 
   const isOrg = client.type === "organisation";
   const matterCount = matters?.length ?? 0;
-  const engagementCount = engagements?.length ?? 0;
   const contactCount = contacts?.length ?? 0;
 
   const detailRows: PropertyRow[] = [
@@ -87,7 +83,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           { label: "PAN", value: client.pan ? <span className="font-mono tnum">{client.pan}</span> : null },
         ]
       : []),
-    { label: "Engagements", value: String(engagementCount) },
     { label: "Matters", value: String(matterCount) },
     { label: "Contacts", value: String(contactCount) },
     { label: "Created", value: fmtDate(client.created_at) },
@@ -187,23 +182,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             </List>
           )}
         </section>
-
-        {engagementCount > 0 && (
-          <section>
-            <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <SectionHeading className="mb-0">Engagements ({engagementCount})</SectionHeading>
-              <RuleHint>A &ldquo;General&rdquo; engagement is auto-created per client.</RuleHint>
-            </div>
-            <List>
-              {engagements!.map((e) => (
-                <ListRow key={e.id} className="justify-between text-sm">
-                  <span className="font-medium">{e.name}</span>
-                  <Tag className="capitalize">{e.status.replace("_", " ")}</Tag>
-                </ListRow>
-              ))}
-            </List>
-          </section>
-        )}
 
         <SectionCard title={`Contacts (${contactCount})`}>
           <ul className="divide-y">

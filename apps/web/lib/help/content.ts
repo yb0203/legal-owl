@@ -37,21 +37,21 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: `
 Legal Owl keeps your litigation practice in one place — it tracks your cases, turns every court update into something you can act on, and helps you keep clients informed, grounded in your real case data.
 
-Everything hangs off one hierarchy: a **Client** is who you act for, an **Engagement** is a body of work for them, a **Matter** is a single case file, and an **Action** is a task on that matter.
+Everything hangs off one simple shape: a **Client** is who you act for, a **Matter** is a single case file, and a **Task** is anything to do on it. Hearings and deadlines are just tasks with a date, so the whole case is one list.
 
 \`\`\`mermaid
 flowchart LR
-  Client["Client"] --> Engagement["Engagement"] --> Matter["Matter"] --> Action["Action (task)"]
+  Client["Client"] --> Matter["Matter"] --> Task["Task (incl. hearing / deadline)"]
 \`\`\`
 
 Then a court update flows into work you can see and act on:
 
 \`\`\`mermaid
 flowchart LR
-  Court["Court update (eCourts)"] --> Event["Court event"] --> Inbox["Inbox"]
-  Inbox -->|accept as task| Task["Task"]
-  Matter["Matter"] --> Hearing["Hearing"]
-  Matter --> Deadline["Deadline"]
+  Court["Court update (eCourts)"] --> Event["Activity (timeline)"] --> Inbox["Inbox"]
+  Inbox -->|accept| Task["Task"]
+  Matter["Matter"] --> Hearing["Hearing (task)"]
+  Matter --> Deadline["Deadline (task)"]
   Hearing --> Agenda["Calendar + Home"]
   Deadline --> Agenda
   Task --> Agenda
@@ -64,7 +64,7 @@ flowchart LR
 2. Open the matter to see its timeline, hearings, deadlines, tasks, and documents.
 3. Check **Home** and the **Inbox** each morning — overdue and due-today work is surfaced first.
 
-> Tip: press **⌘K** (Ctrl+K) anywhere to jump to a page or matter, or to create something new.
+> Tip: use the **Search** box in the header to jump to a page or matter, or to create something new.
 `,
   },
 
@@ -75,7 +75,7 @@ flowchart LR
     body: `
 A **matter** is a single case file: an internal id (e.g. \`M-3\`), an optional **CNR** (the court's case number), a forum, parties, a status, and a next-hearing date.
 
-1. From **Matters** (or the "New" menu / ⌘K), choose **New matter**.
+1. From **Matters** (or the "New" menu / Search), choose **New matter**.
 2. Fill in the title, forum, and parties — optionally the CNR and client.
 3. Open the matter to add hearings, deadlines, tasks, documents, and notes.
 
@@ -88,13 +88,13 @@ The id / CNR chips by the title copy the case number; edit anything from **Edit 
     title: "Triage the Inbox",
     group: "Workflows",
     body: `
-The **Inbox** is where updates about your matters wait for a decision — each names what happened (a new order, a changed hearing date, a status change) and which matter it belongs to.
+The **Inbox** is where updates about your matters wait for a decision — each names what happened (a new order, a changed hearing date, a status change) and which matter it belongs to. (An Inbox item is itself a task, parked in the **Triage** state until you decide.)
 
 | Action | What it does |
 | --- | --- |
-| **Accept as task** | Turns the update into a to-do on its matter (you set priority + due date). |
+| **Accept as task** | Moves it into your work as an active to-do on its matter (you set priority + due date). |
 | **Snooze** | Hides it until you need it — day before the next hearing, tomorrow, next week, or a date you pick. |
-| **Dismiss** | Clears it when no action is needed. |
+| **Dismiss** | Clears it (cancelled) when no action is needed. |
 | **Undo** | A toast after snooze/dismiss brings the item back. |
 
 The sidebar shows a count of items still waiting, so your triage load is always visible.
@@ -106,12 +106,13 @@ The sidebar shows a count of items still waiting, so your triage load is always 
     title: "Work with tasks",
     group: "Workflows",
     body: `
-**Tasks** (Actions) are the things you need to do, each attached to a matter. The Tasks page gathers them across every matter.
+**Tasks** are the things you need to do, each attached to a matter — the Tasks page gathers them across every matter. (Hearings and deadlines are tasks too, just with a date; this page focuses on your to-dos.)
 
 - **Quick-create** at the top — type a title, pick the matter, set priority and due date.
 - The **Open** view groups by time horizon — **Overdue → Today → This week → Later** — so the most urgent work is first.
 - Set status (To-Do, Awaiting Filing, Done, …) and priority from the badges on each row; tick the circle to complete.
 - Filter chips (Open / Overdue / Done / All) carry counts.
+- Accepting an item from the **Inbox** drops a new task straight into this list.
 
 You can also manage tasks inside a matter, on its **Tasks** tab.
 `,
@@ -122,7 +123,7 @@ You can also manage tasks inside a matter, on its **Tasks** tab.
     title: "Hearings & deadlines",
     group: "Workflows",
     body: `
-**Hearings** are scheduled court dates; **deadlines** are dates you must meet (limitation, statutory, or internal). Both live on the matter and feed the Calendar and Home agenda.
+**Hearings** are scheduled court dates; **deadlines** are dates you must meet (limitation, statutory, or internal). Both are just tasks with a date — they live on the matter and feed the Calendar and Home agenda.
 
 - On a matter's **Hearings** tab, add a date and purpose; record the outcome (held / adjourned) afterwards.
 - The matter's **next-hearing date** is computed automatically from the earliest upcoming scheduled hearing.
@@ -150,7 +151,7 @@ Each matter keeps its files together — court orders, judgements, and your own 
     title: "Clients & conflict check",
     group: "Workflows",
     body: `
-**Clients** are the people and organisations you act for. A client page shows their matters, engagements, contacts, and details (address, GSTIN, PAN).
+**Clients** are the people and organisations you act for. A client page shows their matters, contacts, and details (address, GSTIN, PAN).
 
 - Add one from **Clients → New client** — individual or organisation, with contact details.
 - On intake, Legal Owl runs a **conflict check** against the parties in your existing matters.
@@ -190,36 +191,34 @@ The **Calendar** is one agenda of every upcoming hearing and deadline across you
     title: "How it all connects",
     group: "Reference",
     body: `
-The objects Legal Owl works with, and how they fit together. A **Matter** is the hub: hearings, deadlines, documents, the timeline, and inbox updates all hang off it, while Clients and Engagements sit above it and Labels tag across.
+The objects Legal Owl works with, and how they fit together. A **Matter** is the hub: tasks, documents, the timeline, and inbox updates all hang off it, while Clients sit above it and Labels tag across. Hearings and deadlines are tasks with a date, so one **Task** entity covers everything you do.
 
 \`\`\`mermaid
 flowchart TD
-  Client["Client"] --> Engagement["Engagement"]
-  Engagement --> Matter["Matter"]
-  Matter --> Action["Action (task)"]
+  Client["Client"] --> Matter["Matter"]
+  Matter --> Task["Task"]
+  Matter --> Hearing["Hearing (task)"]
+  Matter --> Deadline["Deadline (task)"]
   Client --> Contact["Contact"]
-  Matter --> Hearing["Hearing"]
-  Matter --> Deadline["Deadline"]
   Matter --> Document["Document"]
-  Matter --> Timeline["Court events + remarks"]
-  Matter --> Triage["Inbox (triage)"]
-  Triage -->|accept| Action
-  Action --> State["Workflow state"]
+  Matter --> Activity["Activity (timeline)"]
+  Matter --> Triage["Inbox (task in Triage)"]
+  Triage -->|accept| Task
+  Task --> State["Workflow state"]
   Label["Label"] -.-> Matter
-  Label -.-> Action
+  Label -.-> Task
 \`\`\`
 
 | Entity | What it is |
 | --- | --- |
-| **Client** | A person or organisation you act for — top of the hierarchy. Has engagements, contacts, and conflict flags. |
-| **Engagement** | A body of work for a client (a retainer or brief). Every client gets a default "General" engagement. |
-| **Matter** | A single case file — the hub that owns hearings, deadlines, tasks, documents, and the timeline. Linked to a client + engagement. |
-| **Action (Task)** | Something to do on a matter. Carries a status (workflow state), priority, due date, and source. |
-| **Hearing** | A court date on a matter; the earliest scheduled one sets the next-hearing date. |
-| **Deadline** | A date you must meet (limitation / statutory / internal), rule-computed — never guessed. |
+| **Client** | A person or organisation you act for — the top of the structure. Has contacts and conflict flags. |
+| **Matter** | A single case file — the hub that owns tasks, documents, and the timeline. Linked to a client. |
+| **Task** | Anything to do on a matter. One entity, three flavours — a plain task, a **hearing**, or a **deadline** — each carrying a status (workflow state), priority, date, and any type-specific details. |
+| **Hearing** | A task with a court date; the earliest scheduled one sets the next-hearing date. |
+| **Deadline** | A task with a date you must meet (limitation / statutory / internal), rule-computed — never guessed. |
 | **Document** | A file kept with a matter (court order, judgement, your upload), stored privately. |
-| **Court event & Timeline** | An append-only record of what happened on a matter; merged with your **remarks** into one immutable timeline. |
-| **Triage item (Inbox)** | An incoming update awaiting your decision; can come from a court event and becomes a task when accepted. |
+| **Activity (Timeline)** | An append-only record of what happened on a matter — synced court events plus your immutable **remarks**, in one timeline. |
+| **Inbox (Triage)** | An incoming court update awaiting your decision — a task parked in the Triage state; accepting it moves it into your work. |
 | **Workflow state** | The named status a task is in (To-Do, Awaiting Filing, Done, …); its *type* drives grouping. |
 | **Label** | A coloured tag you create and apply to matters and tasks. |
 | **Conflict flag** | An advisory note raised at intake when a new client matches a party in an existing matter. |
@@ -239,7 +238,9 @@ Your data is **isolated to you** — only you can see your clients and matters (
 
 **Why does a task need a matter?** Every task is part of a case file, so it always carries the context of which matter it advances.
 
-**How do I reset my password?** On the sign-in page, use "Forgot password?" — we'll email a link to set a new one.
+**Are hearings and deadlines separate from tasks?** No — they're tasks with a date and a type. That's why one list, one Calendar, and one set of badges cover everything you do on a case.
+
+**How do I sign in?** Sign-in is passwordless — enter your email and we'll send a one-time link and code. There's no password to remember or reset.
 `,
   },
 ];

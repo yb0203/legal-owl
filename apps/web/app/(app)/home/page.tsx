@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { ChevronRight, Landmark, AlarmClock, CircleCheck, FilePlus2, Plus, Inbox } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getSystemWorkflowStates } from "@/lib/db";
-import { FORUM_LABELS, type ForumType } from "@/lib/types";
+import { getSystemWorkflowStates, getSystemStateId } from "@/lib/db";
+import { FORUM_LABELS, type ForumType, type TaskAttributes } from "@/lib/types";
 import { fmtDateLong, fmtDate, relativeDay } from "@/lib/format";
 import { HearingPill } from "@/components/badges";
 import { Stat, EmptyState } from "@/components/page-header";
 import { TaskRow, type CrossTask } from "@/components/tasks-list";
 import { TimeGroups, groupByTimeHorizon } from "@/components/time-groups";
 import { HelpLink } from "@/components/help/help-link";
+import { HomeSyncButton } from "@/components/home-sync-button";
 import { ModelOrientation } from "@/components/model-orientation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageShell, Panel, SectionHeading, List, ListRow, Callout } from "@/components/layout";
@@ -16,16 +17,20 @@ import { seedSampleData } from "./actions";
 
 interface HearingLite {
   id: string;
-  hearing_date: string;
-  purpose: string | null;
+  due_date: string;
+  attributes: TaskAttributes;
   matter: { id: string; title: string; forum_type: ForumType } | null;
 }
 interface DeadlineLite {
   id: string;
   due_date: string;
-  type: string;
-  basis: string | null;
+  attributes: TaskAttributes;
   matter: { id: string; title: string } | null;
+}
+
+function deadlineLabel(type?: string): string {
+  const t = type ?? "internal";
+  return t[0].toUpperCase() + t.slice(1);
 }
 
 function greeting(): string {
@@ -53,6 +58,8 @@ export default async function HomePage() {
     .select("id", { count: "exact", head: true });
   if ((matterCount ?? 0) === 0) return <Onboarding />;
 
+  const triageId = await getSystemStateId(supabase, "Triage");
+
   const [
     { count: inboxCount },
     { count: openTasks },
@@ -61,18 +68,27 @@ export default async function HomePage() {
     { data: hearings },
     { data: deadlines },
   ] = await Promise.all([
+    // Inbox = type='task' rows parked in the Triage state (minus snoozed).
     supabase
-      .from("triage_items")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("state", "pending")
+      .eq("type", "task")
+      .eq("state_id", triageId ?? "")
       .or(`snoozed_until.is.null,snoozed_until.lte.${now}`),
-    supabase.from("actions").select("id", { count: "exact", head: true }).is("completed_at", null),
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "task")
+      .neq("state_id", triageId ?? "")
+      .is("completed_at", null),
     // Open tasks due within the week (incl. overdue) — grouped by time-horizon.
     supabase
-      .from("actions")
+      .from("tasks")
       .select(
         "id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type), matter:matters(id, title)",
       )
+      .eq("type", "task")
+      .neq("state_id", triageId ?? "")
       .is("completed_at", null)
       .not("due_date", "is", null)
       .lte("due_date", weekEnd)
@@ -80,16 +96,18 @@ export default async function HomePage() {
       .returns<CrossTask[]>(),
     getSystemWorkflowStates(supabase),
     supabase
-      .from("hearings")
-      .select("id, hearing_date, purpose, matter:matters(id, title, forum_type)")
-      .eq("state", "scheduled")
-      .gte("hearing_date", today)
-      .order("hearing_date", { ascending: true })
+      .from("tasks")
+      .select("id, due_date, attributes, matter:matters(id, title, forum_type)")
+      .eq("type", "hearing")
+      .eq("attributes->>court_state", "scheduled")
+      .gte("due_date", today)
+      .order("due_date", { ascending: true })
       .limit(5)
       .returns<HearingLite[]>(),
     supabase
-      .from("deadlines")
-      .select("id, due_date, type, basis, matter:matters(id, title)")
+      .from("tasks")
+      .select("id, due_date, attributes, matter:matters(id, title)")
+      .eq("type", "deadline")
       .gte("due_date", today)
       .order("due_date", { ascending: true })
       .limit(5)
@@ -111,6 +129,7 @@ export default async function HomePage() {
           <Link href="/matters/new" className={buttonVariants({ size: "sm" })}>
             <FilePlus2 className="size-4" /> New matter
           </Link>
+          <HomeSyncButton />
           <Link href="/tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
             <Plus className="size-4" /> Add task
           </Link>
@@ -164,11 +183,11 @@ export default async function HomePage() {
                   title={h.matter?.title ?? "Matter"}
                   subtitle={
                     <>
-                      {h.purpose ?? "Hearing"}
+                      {h.attributes?.purpose ?? "Hearing"}
                       {h.matter ? ` · ${FORUM_LABELS[h.matter.forum_type]}` : ""}
                     </>
                   }
-                  trailing={<HearingPill date={h.hearing_date} />}
+                  trailing={<HearingPill date={h.due_date} />}
                 />
               ))}
             </List>
@@ -183,7 +202,7 @@ export default async function HomePage() {
                 <ListRow key={d.id} className="py-3 text-sm">
                   <AlarmClock className="size-4 shrink-0 text-lemon" />
                   <span className="min-w-0 flex-1 truncate">
-                    {d.basis ?? `${d.type[0].toUpperCase()}${d.type.slice(1)} deadline`}
+                    {d.attributes?.basis ?? `${deadlineLabel(d.attributes?.deadline_type)} deadline`}
                     {d.matter && <span className="ml-2 text-xs text-muted-foreground">{d.matter.title}</span>}
                   </span>
                   <span className="tnum shrink-0 text-xs text-muted-foreground">

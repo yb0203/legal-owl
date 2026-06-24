@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { nextKey } from "@/lib/db";
+import { nextKey, getSystemStateId } from "@/lib/db";
 
 async function authed() {
   const supabase = await createClient();
@@ -12,56 +12,47 @@ async function authed() {
   return { supabase, user };
 }
 
+// Inbox items ARE tasks parked in the Triage state. Accept = move to To-Do
+// (mint a key if it's still keyless); no new row is created.
 export async function acceptTriageItem(formData: FormData) {
   const itemId = String(formData.get("item_id"));
   if (!itemId) return;
   const { supabase, user } = await authed();
   if (!user) return;
 
+  const triageId = await getSystemStateId(supabase, "Triage");
   const { data: item } = await supabase
-    .from("triage_items")
-    .select("id, matter_id, summary, state")
+    .from("tasks")
+    .select("id, key, state_id")
     .eq("id", itemId)
+    .eq("type", "task")
     .maybeSingle();
-  if (!item || item.state !== "pending") return;
+  if (!item || item.state_id !== triageId) return;
 
-  const { data: todo } = await supabase
-    .from("workflow_states")
-    .select("id")
-    .is("lawyer_id", null)
-    .eq("name", "To-Do")
-    .single();
-
-  const { data: action } = await supabase
-    .from("actions")
-    .insert({
-      lawyer_id: user.id,
-      matter_id: item.matter_id,
-      key: await nextKey(supabase, "actions", "ACT-"),
-      title: item.summary,
-      state_id: todo!.id,
+  const todoId = await getSystemStateId(supabase, "To-Do");
+  await supabase
+    .from("tasks")
+    .update({
+      state_id: todoId,
+      key: item.key ?? (await nextKey(supabase, "tasks", "T-")),
       priority: String(formData.get("priority") || "medium"),
       due_date: String(formData.get("due_date") || "") || null,
-      source: "triage",
     })
-    .select("id")
-    .single();
-
-  await supabase
-    .from("triage_items")
-    .update({ state: "accepted", resulting_action_id: action?.id ?? null })
     .eq("id", itemId);
   revalidatePath("/", "layout");
 }
 
+// Dismiss = move to the Cancelled state (out of the Inbox, kept for audit).
 export async function dismissTriageItem(itemId: string) {
   if (!itemId) return;
   const { supabase, user } = await authed();
   if (!user) return;
+  const cancelledId = await getSystemStateId(supabase, "Cancelled");
   const { error } = await supabase
-    .from("triage_items")
-    .update({ state: "dismissed" })
-    .eq("id", itemId);
+    .from("tasks")
+    .update({ state_id: cancelledId, completed_at: new Date().toISOString() })
+    .eq("id", itemId)
+    .eq("type", "task"); // never stamp a state onto a hearing/deadline
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
@@ -79,7 +70,7 @@ export async function snoozeTriageItem(itemId: string, untilIso?: string) {
     until = new Date(untilIso);
   } else {
     const { data: item } = await supabase
-      .from("triage_items")
+      .from("tasks")
       .select("matter_id")
       .eq("id", itemId)
       .maybeSingle();
@@ -107,22 +98,25 @@ export async function snoozeTriageItem(itemId: string, untilIso?: string) {
   }
 
   const { error } = await supabase
-    .from("triage_items")
+    .from("tasks")
     .update({ snoozed_until: until.toISOString() })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("type", "task");
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
 
-// Undo a snooze/dismiss: bring the item back to the active pending list.
+// Undo a snooze/dismiss: bring the item back into the Triage state, unsnoozed.
 export async function reopenTriageItem(itemId: string) {
   if (!itemId) return;
   const { supabase, user } = await authed();
   if (!user) return;
+  const triageId = await getSystemStateId(supabase, "Triage");
   const { error } = await supabase
-    .from("triage_items")
-    .update({ state: "pending", snoozed_until: null })
-    .eq("id", itemId);
+    .from("tasks")
+    .update({ state_id: triageId, snoozed_until: null, completed_at: null })
+    .eq("id", itemId)
+    .eq("type", "task");
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ensureGeneralEngagement } from "@/lib/db";
+import { getCase, getEnums } from "@/lib/ecourts/client";
+import { normalizeCase } from "@/lib/ecourts/normalize";
+import { syncMatter } from "@/lib/ecourts/sync";
 
 const DEMO_CLIENT_TAG = "Sample data — added by “See it in action”.";
 // Demo labels are shared with the real `labels` table, so they're cleared by
@@ -33,6 +35,7 @@ export async function seedSampleData() {
   const inProgress = sid("In Progress");
   const blocked = sid("Blocked");
   const done = sid("Done");
+  const triage = sid("Triage");
 
   const base = new Date();
   const day = (o: number) => {
@@ -80,7 +83,7 @@ export async function seedSampleData() {
     return (existing?.id as string) ?? null;
   }
 
-  // ── Clients + their default engagements ───────────────────────────────────
+  // ── Clients ───────────────────────────────────────────────────────────────
   const cMbecl = await addClient({
     type: "organisation",
     display_name: "McNally Bharat Engineering Co. Ltd.",
@@ -118,13 +121,6 @@ export async function seedSampleData() {
     status: "inactive",
     phone: "+91 90000 22222",
   });
-  const eMbecl = await ensureGeneralEngagement(supabase, lawyer_id, cMbecl);
-  const eSharma = await ensureGeneralEngagement(supabase, lawyer_id, cSharma);
-  const eAcme = await ensureGeneralEngagement(supabase, lawyer_id, cAcme);
-  const eMehta = await ensureGeneralEngagement(supabase, lawyer_id, cMehta);
-  const eZenith = await ensureGeneralEngagement(supabase, lawyer_id, cZenith);
-  const eVerma = await ensureGeneralEngagement(supabase, lawyer_id, cVerma);
-
   // ── Matters ───────────────────────────────────────────────────────────────
   const m1 = await addMatter({
     key: "DEMO-1",
@@ -141,7 +137,6 @@ export async function seedSampleData() {
     lifecycle_state: "active",
     next_hearing_date: day(3),
     client_id: cMbecl,
-    engagement_id: eMbecl,
   });
   const m2 = await addMatter({
     key: "DEMO-2",
@@ -155,7 +150,6 @@ export async function seedSampleData() {
     lifecycle_state: "active",
     next_hearing_date: day(9),
     client_id: cSharma,
-    engagement_id: eSharma,
   });
   const m3 = await addMatter({
     key: "DEMO-3",
@@ -167,7 +161,6 @@ export async function seedSampleData() {
     lifecycle_state: "active",
     next_hearing_date: day(24),
     client_id: cAcme,
-    engagement_id: eAcme,
   });
   const m4 = await addMatter({
     key: "DEMO-4",
@@ -181,7 +174,6 @@ export async function seedSampleData() {
     lifecycle_state: "active",
     next_hearing_date: day(1),
     client_id: cMehta,
-    engagement_id: eMehta,
   });
   const m5 = await addMatter({
     key: "DEMO-5",
@@ -192,7 +184,6 @@ export async function seedSampleData() {
     matter_status: "active",
     lifecycle_state: "pending_first_sync",
     client_id: cZenith,
-    engagement_id: eZenith,
   });
   const m6 = await addMatter({
     key: "DEMO-6",
@@ -205,83 +196,101 @@ export async function seedSampleData() {
     matter_status: "disposed",
     lifecycle_state: "disposed",
     client_id: cVerma,
-    engagement_id: eVerma,
   });
 
-  // ── Hearings (past held + upcoming scheduled) ─────────────────────────────
-  await supabase.from("hearings").insert([
-    { lawyer_id, matter_id: m1, hearing_date: day(3), purpose: "Arguments on interim relief", source: "ecourt", state: "scheduled", ordinal: 0 },
-    { lawyer_id, matter_id: m1, hearing_date: day(18), purpose: "Final arguments", source: "ecourt", state: "scheduled", ordinal: 0 },
-    { lawyer_id, matter_id: m1, hearing_date: day(-22), purpose: "Filing of reply", outcome: "Adjourned", source: "ecourt", state: "held", ordinal: 0 },
-    { lawyer_id, matter_id: m2, hearing_date: day(9), purpose: "Hearing on bail application", source: "ecourt", state: "scheduled", ordinal: 0 },
-    { lawyer_id, matter_id: m2, hearing_date: day(-30), purpose: "Notice to respondents", outcome: "Notice issued", source: "ecourt", state: "held", ordinal: 0 },
-    { lawyer_id, matter_id: m3, hearing_date: day(24), purpose: "Constitution of Committee of Creditors", source: "ecourt", state: "scheduled", ordinal: 0 },
-    { lawyer_id, matter_id: m4, hearing_date: day(1), purpose: "Framing of issues", source: "ecourt", state: "scheduled", ordinal: 0 },
-    { lawyer_id, matter_id: m4, hearing_date: day(-40), purpose: "Filing of written statement", outcome: "WS taken on record", source: "ecourt", state: "held", ordinal: 0 },
-    { lawyer_id, matter_id: m6, hearing_date: day(-60), purpose: "Final hearing", outcome: "Complaint allowed", source: "ecourt", state: "held", ordinal: 0 },
+  // ── Hearings (past held + upcoming scheduled) — tasks of type='hearing' ────
+  const hearing = (matter_id: string, d: string, purpose: string, court_state: string, outcome?: string) => ({
+    lawyer_id, matter_id, type: "hearing", title: purpose, due_date: d, source: "sync",
+    attributes: { purpose, outcome: outcome ?? null, court_state },
+  });
+  await supabase.from("tasks").insert([
+    hearing(m1, day(3), "Arguments on interim relief", "scheduled"),
+    hearing(m1, day(18), "Final arguments", "scheduled"),
+    hearing(m1, day(-22), "Filing of reply", "held", "Adjourned"),
+    hearing(m2, day(9), "Hearing on bail application", "scheduled"),
+    hearing(m2, day(-30), "Notice to respondents", "held", "Notice issued"),
+    hearing(m3, day(24), "Constitution of Committee of Creditors", "scheduled"),
+    hearing(m4, day(1), "Framing of issues", "scheduled"),
+    hearing(m4, day(-40), "Filing of written statement", "held", "WS taken on record"),
+    hearing(m6, day(-60), "Final hearing", "held", "Complaint allowed"),
   ]);
 
-  // ── Court events (full range of event types) ──────────────────────────────
-  await supabase.from("court_events").insert([
-    { lawyer_id, matter_id: m1, event_type: "judge_changed", new_value: "Bench reconstituted", occurred_at: at(-12), source_type: "ecourt", content_hash: "demo-m1-e1" },
-    { lawyer_id, matter_id: m1, event_type: "order_uploaded", new_value: "Interim order uploaded", occurred_at: at(-8), source_type: "ecourt", content_hash: "demo-m1-e2" },
-    { lawyer_id, matter_id: m1, event_type: "hearing_date_changed", previous_value: day(-2), new_value: day(3), occurred_at: at(-6), source_type: "ecourt", content_hash: "demo-m1-e3" },
-    { lawyer_id, matter_id: m1, event_type: "document_added", new_value: "Respondent's reply uploaded", occurred_at: at(-4), source_type: "ecourt", content_hash: "demo-m1-e4" },
-    { lawyer_id, matter_id: m2, event_type: "status_changed", previous_value: "Fresh", new_value: "Pending", occurred_at: at(-15), source_type: "ecourt", content_hash: "demo-m2-e1" },
-    { lawyer_id, matter_id: m2, event_type: "order_uploaded", new_value: "Order on bail application uploaded", occurred_at: at(-3), source_type: "ecourt", content_hash: "demo-m2-e2" },
-    { lawyer_id, matter_id: m3, event_type: "status_changed", previous_value: "Fresh", new_value: "Admitted", occurred_at: at(-20), source_type: "ecourt", content_hash: "demo-m3-e1" },
-    { lawyer_id, matter_id: m4, event_type: "hearing_date_changed", previous_value: day(-7), new_value: day(1), occurred_at: at(-5), source_type: "ecourt", content_hash: "demo-m4-e1" },
-    { lawyer_id, matter_id: m4, event_type: "document_added", new_value: "Amended plaint uploaded", occurred_at: at(-2), source_type: "ecourt", content_hash: "demo-m4-e2" },
-    { lawyer_id, matter_id: m6, event_type: "order_uploaded", new_value: "Final order uploaded", occurred_at: at(-55), source_type: "ecourt", content_hash: "demo-m6-e1" },
-    { lawyer_id, matter_id: m6, event_type: "status_changed", previous_value: "Pending", new_value: "Disposed", occurred_at: at(-55), source_type: "ecourt", content_hash: "demo-m6-e2" },
+  // ── Court events (full range of event types) — activity kind='court_event' ─
+  const ce = (matter_id: string, event_type: string, new_value: string, at_: string, content_hash: string, previous_value?: string) => ({
+    lawyer_id, matter_id, kind: "court_event", event_type, new_value, previous_value: previous_value ?? null,
+    occurred_at: at_, source: "ecourt", content_hash,
+  });
+  await supabase.from("activity").insert([
+    ce(m1, "judge_changed", "Bench reconstituted", at(-12), "demo-m1-e1"),
+    ce(m1, "order_uploaded", "Interim order uploaded", at(-8), "demo-m1-e2"),
+    ce(m1, "hearing_date_changed", day(3), at(-6), "demo-m1-e3", day(-2)),
+    ce(m1, "document_added", "Respondent's reply uploaded", at(-4), "demo-m1-e4"),
+    ce(m2, "status_changed", "Pending", at(-15), "demo-m2-e1", "Fresh"),
+    ce(m2, "order_uploaded", "Order on bail application uploaded", at(-3), "demo-m2-e2"),
+    ce(m3, "status_changed", "Admitted", at(-20), "demo-m3-e1", "Fresh"),
+    ce(m4, "hearing_date_changed", day(1), at(-5), "demo-m4-e1", day(-7)),
+    ce(m4, "document_added", "Amended plaint uploaded", at(-2), "demo-m4-e2"),
+    ce(m6, "order_uploaded", "Final order uploaded", at(-55), "demo-m6-e1"),
+    ce(m6, "status_changed", "Disposed", at(-55), "demo-m6-e2", "Pending"),
   ]);
 
-  // ── Remarks (lawyer's own notes) ──────────────────────────────────────────
-  await supabase.from("remarks").insert([
-    { lawyer_id, matter_id: m1, body: "Client informed of the new hearing date. Rejoinder to be filed before the next date.", created_at: at(-5) },
-    { lawyer_id, matter_id: m1, body: "Senior counsel briefed; rejoinder draft circulated for review.", created_at: at(-2) },
-    { lawyer_id, matter_id: m2, body: "Client to provide updated medical documents before the next date.", created_at: at(-1) },
-    { lawyer_id, matter_id: m3, body: "Section 9 petition admitted. Awaiting constitution of CoC.", created_at: at(-3) },
-    { lawyer_id, matter_id: m4, body: "Defendant likely to seek adjournment; oppose and press for issue framing.", created_at: at(-1) },
-    { lawyer_id, matter_id: m5, body: "SLP drafted; to be filed this week. Awaiting eCourts listing after filing.", created_at: at(-1) },
-    { lawyer_id, matter_id: m6, body: "Complaint allowed; compensation awarded to client. Matter closed.", created_at: at(-50) },
+  // ── Remarks (lawyer's own notes) — activity kind='remark' ─────────────────
+  const remark = (matter_id: string, body: string, at_: string) => ({
+    lawyer_id, matter_id, kind: "remark", body, source: "lawyer_manual", occurred_at: at_,
+  });
+  await supabase.from("activity").insert([
+    remark(m1, "Client informed of the new hearing date. Rejoinder to be filed before the next date.", at(-5)),
+    remark(m1, "Senior counsel briefed; rejoinder draft circulated for review.", at(-2)),
+    remark(m2, "Client to provide updated medical documents before the next date.", at(-1)),
+    remark(m3, "Section 9 petition admitted. Awaiting constitution of CoC.", at(-3)),
+    remark(m4, "Defendant likely to seek adjournment; oppose and press for issue framing.", at(-1)),
+    remark(m5, "SLP drafted; to be filed this week. Awaiting eCourts listing after filing.", at(-1)),
+    remark(m6, "Complaint allowed; compensation awarded to client. Matter closed.", at(-50)),
   ]);
 
-  // ── Actions (overdue / today / upcoming, varied states) ───────────────────
+  // ── Tasks (overdue / today / upcoming, varied states) — type='task' ───────
   const { data: actionRows } = await supabase
-    .from("actions")
+    .from("tasks")
     .insert([
-      { lawyer_id, matter_id: m1, key: "DEMO-A1", title: "File rejoinder to respondent's reply", state_id: inProgress, priority: "high", due_date: day(2), source: "manual" },
-      { lawyer_id, matter_id: m1, key: "DEMO-A2", title: "Brief senior counsel for arguments", state_id: todo, priority: "medium", due_date: day(2), source: "manual" },
-      { lawyer_id, matter_id: m1, key: "DEMO-A3", title: "Pay arbitral tribunal fee", state_id: awaitingFiling, priority: "low", due_date: day(5), source: "manual" },
-      { lawyer_id, matter_id: m2, key: "DEMO-A4", title: "Collect medical records from client", state_id: blocked, priority: "medium", due_date: day(6), source: "manual" },
-      { lawyer_id, matter_id: m2, key: "DEMO-A5", title: "Draft bail application", state_id: todo, priority: "high", due_date: day(0), source: "manual" },
-      { lawyer_id, matter_id: m3, key: "DEMO-A6", title: "Verify claims received from creditors", state_id: todo, priority: "low", source: "manual" },
-      { lawyer_id, matter_id: m4, key: "DEMO-A7", title: "Prepare for issue framing", state_id: inProgress, priority: "high", due_date: day(0), source: "manual" },
-      { lawyer_id, matter_id: m4, key: "DEMO-A8", title: "Serve amended plaint on defendant", state_id: todo, priority: "urgent", due_date: day(-3), source: "manual" },
-      { lawyer_id, matter_id: m5, key: "DEMO-A9", title: "Finalise SLP paper-book", state_id: awaitingFiling, priority: "high", due_date: day(2), source: "manual" },
-      { lawyer_id, matter_id: m6, key: "DEMO-A10", title: "Send closure note to client", state_id: done, priority: "none", source: "manual", completed_at: at(-48) },
+      { lawyer_id, matter_id: m1, type: "task", key: "DEMO-A1", title: "File rejoinder to respondent's reply", state_id: inProgress, priority: "high", due_date: day(2), source: "manual" },
+      { lawyer_id, matter_id: m1, type: "task", key: "DEMO-A2", title: "Brief senior counsel for arguments", state_id: todo, priority: "medium", due_date: day(2), source: "manual" },
+      { lawyer_id, matter_id: m1, type: "task", key: "DEMO-A3", title: "Pay arbitral tribunal fee", state_id: awaitingFiling, priority: "low", due_date: day(5), source: "manual" },
+      { lawyer_id, matter_id: m2, type: "task", key: "DEMO-A4", title: "Collect medical records from client", state_id: blocked, priority: "medium", due_date: day(6), source: "manual" },
+      { lawyer_id, matter_id: m2, type: "task", key: "DEMO-A5", title: "Draft bail application", state_id: todo, priority: "high", due_date: day(0), source: "manual" },
+      { lawyer_id, matter_id: m3, type: "task", key: "DEMO-A6", title: "Verify claims received from creditors", state_id: todo, priority: "low", source: "manual" },
+      { lawyer_id, matter_id: m4, type: "task", key: "DEMO-A7", title: "Prepare for issue framing", state_id: inProgress, priority: "high", due_date: day(0), source: "manual" },
+      { lawyer_id, matter_id: m4, type: "task", key: "DEMO-A8", title: "Serve amended plaint on defendant", state_id: todo, priority: "urgent", due_date: day(-3), source: "manual" },
+      { lawyer_id, matter_id: m5, type: "task", key: "DEMO-A9", title: "Finalise SLP paper-book", state_id: awaitingFiling, priority: "high", due_date: day(2), source: "manual" },
+      { lawyer_id, matter_id: m6, type: "task", key: "DEMO-A10", title: "Send closure note to client", state_id: done, priority: "none", source: "manual", completed_at: at(-48) },
     ])
     .select("id, key");
   const actionId = (key: string) => actionRows?.find((a) => a.key === key)?.id as string | undefined;
 
-  // ── Deadlines (rule-bearing dates, incl. an overdue limitation) ───────────
-  await supabase.from("deadlines").insert([
-    { lawyer_id, matter_id: m1, type: "internal", due_date: day(1), basis: "Rejoinder to be filed" },
-    { lawyer_id, matter_id: m1, type: "statutory", due_date: day(6), basis: "Window to file objections to interim order" },
-    { lawyer_id, matter_id: m2, type: "limitation", due_date: day(4), basis: "Limitation to file revision petition" },
-    { lawyer_id, matter_id: m4, type: "limitation", due_date: day(-1), basis: "Limitation for written statement (CPC Order VIII)" },
-    { lawyer_id, matter_id: m4, type: "internal", due_date: day(3), basis: "Compile documents for issue framing" },
-    { lawyer_id, matter_id: m5, type: "statutory", due_date: day(7), basis: "90-day limitation to file SLP (Art. 133)" },
+  // ── Deadlines (rule-bearing dates, incl. an overdue limitation) — type='deadline' ─
+  const deadline = (matter_id: string, deadline_type: string, d: string, basis: string) => ({
+    lawyer_id, matter_id, type: "deadline", title: basis, due_date: d, source: "manual",
+    attributes: { deadline_type, basis },
+  });
+  await supabase.from("tasks").insert([
+    deadline(m1, "internal", day(1), "Rejoinder to be filed"),
+    deadline(m1, "statutory", day(6), "Window to file objections to interim order"),
+    deadline(m2, "limitation", day(4), "Limitation to file revision petition"),
+    deadline(m4, "limitation", day(-1), "Limitation for written statement (CPC Order VIII)"),
+    deadline(m4, "internal", day(3), "Compile documents for issue framing"),
+    deadline(m5, "statutory", day(7), "90-day limitation to file SLP (Art. 133)"),
   ]);
 
-  // ── Triage / Inbox (pending court updates + one snoozed) ──────────────────
-  await supabase.from("triage_items").insert([
-    { lawyer_id, matter_id: m1, kind: "order_uploaded", summary: "New interim order uploaded on eCourts", state: "pending" },
-    { lawyer_id, matter_id: m2, kind: "hearing_date_changed", summary: "Hearing listed for " + day(9), state: "pending" },
-    { lawyer_id, matter_id: m2, kind: "status_changed", summary: "Case status changed: Fresh → Pending", state: "pending" },
-    { lawyer_id, matter_id: m4, kind: "order_uploaded", summary: "Amended plaint accepted on record", state: "pending" },
-    { lawyer_id, matter_id: m3, kind: "status_changed", summary: "Petition admitted by NCLT", state: "pending", snoozed_until: at(2) },
+  // ── Triage / Inbox — type='task' parked in the Triage state ───────────────
+  const triageTask = (matter_id: string, triage_kind: string, summary: string, snoozed_until?: string) => ({
+    lawyer_id, matter_id, type: "task", state_id: triage, title: summary, source: "triage",
+    attributes: { triage_kind }, snoozed_until: snoozed_until ?? null,
+  });
+  await supabase.from("tasks").insert([
+    triageTask(m1, "order_uploaded", "New interim order uploaded on eCourts"),
+    triageTask(m2, "hearing_date_changed", "Hearing listed for " + day(9)),
+    triageTask(m2, "status_changed", "Case status changed: Fresh → Pending"),
+    triageTask(m4, "order_uploaded", "Amended plaint accepted on record"),
+    triageTask(m3, "status_changed", "Petition admitted by NCLT", at(2)),
   ]);
 
   // ── Labels (created last so a label issue can't block the core seed) ──────
@@ -301,9 +310,9 @@ export async function seedSampleData() {
     { matter_id: m4, label_id: lUrgent },
     { matter_id: m5, label_id: lAppeal },
   ]
-    .map(({ matter_id, label_id }) => ({ lawyer_id, matter_id, label_id }))
-    .filter((r): r is { lawyer_id: string; matter_id: string; label_id: string } => !!r.label_id);
-  if (matterLabels.length) await supabase.from("matter_labels").insert(matterLabels);
+    .map(({ matter_id, label_id }) => ({ lawyer_id, target_type: "matter", target_id: matter_id, label_id }))
+    .filter((r): r is { lawyer_id: string; target_type: string; target_id: string; label_id: string } => !!r.label_id);
+  if (matterLabels.length) await supabase.from("taggings").insert(matterLabels);
 
   const actionLabels = [
     { key: "DEMO-A1", label_id: lUrgent },
@@ -313,9 +322,41 @@ export async function seedSampleData() {
     { key: "DEMO-A9", label_id: lFiling },
     { key: "DEMO-A9", label_id: lAppeal },
   ]
-    .map(({ key, label_id }) => ({ lawyer_id, action_id: actionId(key), label_id }))
-    .filter((r): r is { lawyer_id: string; action_id: string; label_id: string } => !!r.action_id && !!r.label_id);
-  if (actionLabels.length) await supabase.from("action_labels").insert(actionLabels);
+    .map(({ key, label_id }) => ({ lawyer_id, target_type: "task", target_id: actionId(key), label_id }))
+    .filter((r): r is { lawyer_id: string; target_type: string; target_id: string; label_id: string } => !!r.target_id && !!r.label_id);
+  if (actionLabels.length) await supabase.from("taggings").insert(actionLabels);
+
+  // ── A genuinely live eCourts case (demo D2) ───────────────────────────────
+  // Seed one matter backed by a real, public CNR and sync it for real, so the
+  // demo shows an authentic eCourts connection — not a fabricated timeline.
+  // Best-effort + key-gated; if the key/credits are absent the demo just omits it.
+  if (process.env.ECOURTS_API_KEY) {
+    const REAL_CNR = "MPHC030045132023"; // real, public, pending High Court case
+    try {
+      const res = await getCase(REAL_CNR);
+      if (res.ok) {
+        const n = normalizeCase(res.data, await getEnums());
+        const title =
+          [n.petitioners[0], n.respondents[0]].filter(Boolean).join(" vs ") || "Live eCourts case";
+        const mReal = await addMatter({
+          key: "DEMO-7",
+          cnr: REAL_CNR,
+          forum_type: n.forum_type ?? "high_court",
+          case_type: n.case_type,
+          title,
+          parties: { petitioners: n.petitioners, respondents: n.respondents },
+          court_status: n.court_status,
+          matter_status: "active",
+          lifecycle_state: "active",
+          next_hearing_date: n.next_hearing_date,
+          client_id: cMbecl,
+        });
+        await syncMatter(supabase, { id: mReal, lawyer_id, court_status: null, next_hearing_date: null }, n);
+      }
+    } catch {
+      /* live sync is best-effort — the rest of the demo stands without it */
+    }
+  }
 
   revalidatePath("/", "layout");
   redirect("/home");
@@ -325,9 +366,25 @@ async function clearDemo(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lawyerId: string,
 ) {
-  // Deleting matters cascades to their hearings, events, remarks, actions,
-  // deadlines, triage, and label-join rows; clients and demo labels are removed
-  // separately. Real labels of the same name are an accepted edge case.
+  // taggings is polymorphic (no FK on target_id), so a matter delete won't
+  // cascade to its matter/task taggings — clear them explicitly first.
+  const { data: demoMatters } = await supabase
+    .from("matters")
+    .select("id")
+    .eq("lawyer_id", lawyerId)
+    .like("key", "DEMO-%");
+  const matterIds = (demoMatters ?? []).map((m) => m.id as string);
+  if (matterIds.length) {
+    const { data: demoTasks } = await supabase.from("tasks").select("id").in("matter_id", matterIds);
+    const taskIds = (demoTasks ?? []).map((t) => t.id as string);
+    if (taskIds.length) {
+      await supabase.from("taggings").delete().eq("target_type", "task").in("target_id", taskIds);
+    }
+    await supabase.from("taggings").delete().eq("target_type", "matter").in("target_id", matterIds);
+  }
+  // Deleting matters cascades to their tasks (hearings/deadlines/triage included)
+  // and activity rows; clients and demo labels are removed separately. Real
+  // labels of the same name are an accepted edge case.
   await supabase.from("matters").delete().eq("lawyer_id", lawyerId).like("key", "DEMO-%");
   await supabase.from("clients").delete().eq("lawyer_id", lawyerId).eq("notes", DEMO_CLIENT_TAG);
   await supabase.from("labels").delete().eq("lawyer_id", lawyerId).in("name", DEMO_LABEL_NAMES);

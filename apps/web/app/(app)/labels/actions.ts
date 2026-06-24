@@ -58,34 +58,38 @@ export async function createLabel(name: string, color?: string): Promise<Label |
 // least-privilege gap where a join row could reference another lawyer's FK target.
 async function ownsRow(
   supabase: Awaited<ReturnType<typeof authed>>["supabase"],
-  table: "actions" | "matters" | "labels",
+  table: "tasks" | "matters" | "labels",
   id: string,
 ): Promise<boolean> {
   const { data } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
   return Boolean(data);
 }
 
-export async function assignLabelToTask(actionId: string, labelId: string) {
-  if (!actionId || !labelId) return;
+export async function assignLabelToTask(taskId: string, labelId: string) {
+  if (!taskId || !labelId) return;
   const { supabase, user } = await authed();
   if (!user) return;
-  // Only let a lawyer tag their own action with their own label.
-  if (!(await ownsRow(supabase, "actions", actionId)) || !(await ownsRow(supabase, "labels", labelId))) return;
-  // Unique (action_id, label_id) PK prevents duplicate assignment.
+  // Only let a lawyer tag their own task with their own label.
+  if (!(await ownsRow(supabase, "tasks", taskId)) || !(await ownsRow(supabase, "labels", labelId))) return;
+  // PK (target_type, target_id, label_id) prevents duplicate assignment.
   await supabase
-    .from("action_labels")
-    .upsert({ lawyer_id: user.id, action_id: actionId, label_id: labelId }, { onConflict: "action_id,label_id", ignoreDuplicates: true });
+    .from("taggings")
+    .upsert(
+      { lawyer_id: user.id, target_type: "task", target_id: taskId, label_id: labelId },
+      { onConflict: "target_type,target_id,label_id", ignoreDuplicates: true },
+    );
   revalidatePath("/", "layout");
 }
 
-export async function unassignLabelFromTask(actionId: string, labelId: string) {
-  if (!actionId || !labelId) return;
+export async function unassignLabelFromTask(taskId: string, labelId: string) {
+  if (!taskId || !labelId) return;
   const { supabase, user } = await authed();
   if (!user) return;
   await supabase
-    .from("action_labels")
+    .from("taggings")
     .delete()
-    .eq("action_id", actionId)
+    .eq("target_type", "task")
+    .eq("target_id", taskId)
     .eq("label_id", labelId);
   revalidatePath("/", "layout");
 }
@@ -96,10 +100,12 @@ export async function assignLabelToMatter(matterId: string, labelId: string) {
   if (!user) return;
   // Only let a lawyer tag their own matter with their own label.
   if (!(await ownsRow(supabase, "matters", matterId)) || !(await ownsRow(supabase, "labels", labelId))) return;
-  // Unique (matter_id, label_id) PK prevents duplicate assignment.
   await supabase
-    .from("matter_labels")
-    .upsert({ lawyer_id: user.id, matter_id: matterId, label_id: labelId }, { onConflict: "matter_id,label_id", ignoreDuplicates: true });
+    .from("taggings")
+    .upsert(
+      { lawyer_id: user.id, target_type: "matter", target_id: matterId, label_id: labelId },
+      { onConflict: "target_type,target_id,label_id", ignoreDuplicates: true },
+    );
   revalidatePath("/", "layout");
 }
 
@@ -108,9 +114,10 @@ export async function unassignLabelFromMatter(matterId: string, labelId: string)
   const { supabase, user } = await authed();
   if (!user) return;
   await supabase
-    .from("matter_labels")
+    .from("taggings")
     .delete()
-    .eq("matter_id", matterId)
+    .eq("target_type", "matter")
+    .eq("target_id", matterId)
     .eq("label_id", labelId);
   revalidatePath("/", "layout");
 }
