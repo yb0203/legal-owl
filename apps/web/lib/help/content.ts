@@ -88,13 +88,13 @@ The id / CNR chips by the title copy the case number; edit anything from **Edit 
     title: "Triage the Inbox",
     group: "Workflows",
     body: `
-The **Inbox** is where updates about your matters wait for a decision — each names what happened (a new order, a changed hearing date, a status change) and which matter it belongs to.
+The **Inbox** is where updates about your matters wait for a decision — each names what happened (a new order, a changed hearing date, a status change) and which matter it belongs to. (An Inbox item is itself a task, parked in the **Triage** state until you decide.)
 
 | Action | What it does |
 | --- | --- |
-| **Accept as task** | Turns the update into a to-do on its matter (you set priority + due date). |
+| **Accept as task** | Moves it into your work as an active to-do on its matter (you set priority + due date). |
 | **Snooze** | Hides it until you need it — day before the next hearing, tomorrow, next week, or a date you pick. |
-| **Dismiss** | Clears it when no action is needed. |
+| **Dismiss** | Clears it (cancelled) when no action is needed. |
 | **Undo** | A toast after snooze/dismiss brings the item back. |
 
 The sidebar shows a count of items still waiting, so your triage load is always visible.
@@ -106,12 +106,13 @@ The sidebar shows a count of items still waiting, so your triage load is always 
     title: "Work with tasks",
     group: "Workflows",
     body: `
-**Tasks** (Actions) are the things you need to do, each attached to a matter. The Tasks page gathers them across every matter.
+**Tasks** are the things you need to do, each attached to a matter — the Tasks page gathers them across every matter. (Hearings and deadlines are tasks too, just with a date; this page focuses on your to-dos.)
 
 - **Quick-create** at the top — type a title, pick the matter, set priority and due date.
 - The **Open** view groups by time horizon — **Overdue → Today → This week → Later** — so the most urgent work is first.
 - Set status (To-Do, Awaiting Filing, Done, …) and priority from the badges on each row; tick the circle to complete.
 - Filter chips (Open / Overdue / Done / All) carry counts.
+- Accepting an item from the **Inbox** drops a new task straight into this list.
 
 You can also manage tasks inside a matter, on its **Tasks** tab.
 `,
@@ -122,7 +123,7 @@ You can also manage tasks inside a matter, on its **Tasks** tab.
     title: "Hearings & deadlines",
     group: "Workflows",
     body: `
-**Hearings** are scheduled court dates; **deadlines** are dates you must meet (limitation, statutory, or internal). Both live on the matter and feed the Calendar and Home agenda.
+**Hearings** are scheduled court dates; **deadlines** are dates you must meet (limitation, statutory, or internal). Both are just tasks with a date — they live on the matter and feed the Calendar and Home agenda.
 
 - On a matter's **Hearings** tab, add a date and purpose; record the outcome (held / adjourned) afterwards.
 - The matter's **next-hearing date** is computed automatically from the earliest upcoming scheduled hearing.
@@ -237,7 +238,9 @@ Your data is **isolated to you** — only you can see your clients and matters (
 
 **Why does a task need a matter?** Every task is part of a case file, so it always carries the context of which matter it advances.
 
-**How do I reset my password?** On the sign-in page, use "Forgot password?" — we'll email a link to set a new one.
+**Are hearings and deadlines separate from tasks?** No — they're tasks with a date and a type. That's why one list, one Calendar, and one set of badges cover everything you do on a case.
+
+**How do I sign in?** Sign-in is passwordless — enter your email and we'll send a one-time link and code. There's no password to remember or reset.
 `,
   },
 ];
