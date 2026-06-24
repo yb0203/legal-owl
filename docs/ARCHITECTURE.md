@@ -1,6 +1,6 @@
 ---
 name: Legal Owl Architecture
-last_updated: 2026-06-20
+last_updated: 2026-06-24
 status: canonical — source of truth for technical direction
 ---
 
@@ -9,6 +9,17 @@ status: canonical — source of truth for technical direction
 This is the canonical, finalized architecture for Legal Owl. It is the technical counterpart to
 `STRATEGY.md` (which remains the source of truth for product direction). When code lands, keep this
 document current.
+
+> **Data model update (2026-06-24): task-first re-model.** The shipped schema collapsed the original
+> per-entity tables into a unified, Linear-inspired model. Where this doc says `court_events` +
+> `remarks`, the implementation is one append-only **`activity`** table (column `source`, not
+> `source_type`; no `UNION ALL` view). Where it says `Action` (and separate
+> `hearings`/`deadlines`/`triage_items`), the implementation is one **`tasks`** table
+> (`type: task | hearing | deadline` + a JSONB `attributes` bag; the Inbox is tasks in the system
+> `Triage` state). Engagements were dropped (Matter links Client directly); `matters.last_event_at`
+> was removed. See `CLAUDE.md` → "Domain hierarchy" and
+> `supabase/migrations/20260624000001_task_first_model.sql` for the current shape; the principles
+> below (append-only timeline, projections written only by sync, per-lawyer RLS) are unchanged.
 
 **Product framing:** an **AI-native legal office** for solo Indian litigation lawyers to manage **cases and
 clients** elegantly. AI is woven through the product (not a bolt-on, not chat-first); the dashboard stays the

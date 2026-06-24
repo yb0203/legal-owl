@@ -18,9 +18,12 @@ export async function getSystemWorkflowStates(
 // client so RLS applies — they are NOT server actions themselves.
 
 /**
- * Sequential human key like M-7 / T-12, scoped to the lawyer via RLS. Only
- * type='task' rows are keyed, so the tasks count is scoped to that type
- * (hearings/deadlines/triage rows stay keyless and don't inflate the sequence).
+ * Sequential human key like M-7 / T-12, scoped to the lawyer via RLS. For tasks,
+ * count only rows that already carry a key (`type='task'` + non-null key) — NOT
+ * all type='task' rows. Triage/hearing/deadline rows are type='task' but keyless,
+ * and accepting a Triage item mints a key in place (no new row), so counting all
+ * task rows would over- or under-count and re-mint an existing T-N, tripping
+ * unique(lawyer_id, key). Counting keyed rows keeps the sequence dense.
  */
 export async function nextKey(
   supabase: SupabaseClient,
@@ -28,7 +31,7 @@ export async function nextKey(
   prefix: string,
 ): Promise<string> {
   let query = supabase.from(table).select("id", { count: "exact", head: true });
-  if (table === "tasks") query = query.eq("type", "task");
+  if (table === "tasks") query = query.eq("type", "task").not("key", "is", null);
   const { count } = await query;
   return `${prefix}${(count ?? 0) + 1}`;
 }

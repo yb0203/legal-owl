@@ -132,19 +132,26 @@ export async function syncMatter(
       .eq("matter_id", matter_id)
       .eq("type", "hearing");
     const byDate = new Map((existing ?? []).map((h) => [h.due_date as string, h]));
+    const queued = new Set<string>(); // guard against the same date repeating in one response
     const toInsert: Record<string, unknown>[] = [];
     for (const h of c.hearings) {
       const court_state = h.hearing_date < today ? "held" : "scheduled";
       const found = byDate.get(h.hearing_date);
       if (found) {
-        const attributes = {
-          ...((found.attributes as Record<string, unknown>) ?? {}),
-          purpose: h.purpose,
-          outcome: h.outcome,
-          court_state,
-        };
-        await supabase.from("tasks").update({ attributes }).eq("id", found.id as string);
-      } else {
+        const prev = (found.attributes as Record<string, unknown>) ?? {};
+        // Never clobber a hearing the lawyer has recorded an outcome on — the
+        // synced history has no outcome field, so re-syncing would null it out.
+        if (!prev.outcome) {
+          const attributes = {
+            ...prev,
+            purpose: h.purpose ?? prev.purpose ?? null,
+            outcome: h.outcome ?? null,
+            court_state,
+          };
+          await supabase.from("tasks").update({ attributes }).eq("id", found.id as string);
+        }
+      } else if (!queued.has(h.hearing_date)) {
+        queued.add(h.hearing_date);
         toInsert.push({
           lawyer_id,
           matter_id,

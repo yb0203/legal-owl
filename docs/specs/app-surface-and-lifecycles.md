@@ -1,9 +1,17 @@
 ---
 date: 2026-06-21
 topic: app-surface-and-lifecycles
+superseded_by: task-first re-model (2026-06-24)
 ---
 
 # App Surface & Lifecycles — Requirements
+
+> **Superseded (2026-06-24).** Kept for history. The **Engagement** layer described here was
+> **dropped**: the hierarchy is now **Client → Matter → Task** (a Matter links its Client directly;
+> there is no `engagement_id`). Hearings, deadlines, and triage items are typed **`tasks`** rows, not
+> separate entities. The app-shell, onboarding, and conflict-check behaviour below still hold.
+> Current source of truth: `CLAUDE.md` → "Domain hierarchy" and
+> `supabase/migrations/20260624000001_task_first_model.sql`.
 
 ## Summary
 

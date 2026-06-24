@@ -51,7 +51,8 @@ export async function dismissTriageItem(itemId: string) {
   const { error } = await supabase
     .from("tasks")
     .update({ state_id: cancelledId, completed_at: new Date().toISOString() })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("type", "task"); // never stamp a state onto a hearing/deadline
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
@@ -99,7 +100,8 @@ export async function snoozeTriageItem(itemId: string, untilIso?: string) {
   const { error } = await supabase
     .from("tasks")
     .update({ snoozed_until: until.toISOString() })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("type", "task");
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
@@ -113,7 +115,8 @@ export async function reopenTriageItem(itemId: string) {
   const { error } = await supabase
     .from("tasks")
     .update({ state_id: triageId, snoozed_until: null, completed_at: null })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("type", "task");
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
