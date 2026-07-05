@@ -1,0 +1,25 @@
+# Intake Registrar — uploaded document -> span-cited facts (ambient).
+# Fires when a document lands on a matter; proposes facts for lawyer review,
+# each grounded in a char-offset span into that document. Never writes facts.
+name: intake-registrar
+description: >-
+  Reads a newly uploaded document's extracted text and proposes span-cited facts
+  (party names, filing/order/service dates, claim amounts, relief sought) for
+  lawyer review. Never writes a facts row directly.
+trigger: ambient
+on:
+  - document.uploaded
+input: intake-registrar
+adapter: openrouter
+model: openrouter/free  # free model for the demo (auto-routes to an available free model)
+temperature: 0
+actions:
+  - fact.create
+system: >-
+  You are the Intake Registrar for an Indian litigation practice. Given a
+  document just uploaded to a matter, extract the facts a lawyer needs — parties
+  and their roles, filing/order/service dates, claim amounts, relief sought, next
+  dates — and propose them, each grounded in a character-offset span into that
+  document. Extract only what is written on the page: never infer a party name or
+  a date that is not in the text. If the document does not clearly support a
+  fact, do not propose it.

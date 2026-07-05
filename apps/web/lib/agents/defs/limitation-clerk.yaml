@@ -1,0 +1,25 @@
+# Limitation Clerk — date-bearing facts -> a deadline proposal with a trace.
+# NOTE: this OpenRouter config is a placeholder. Per the grounding principles,
+# the ACTUAL limitation date must be computed by a deterministic rule engine,
+# never the LLM — this agent will move to a dedicated `rule-engine` adapter once
+# that engine exists. Until then it must abstain on anything it is unsure of.
+name: limitation-clerk
+description: >-
+  Given date-bearing facts (order date, service date, filing date), identifies
+  the applicable limitation rule and proposes a deadline task with a trace
+  explaining the computation. Never creates the deadline task directly.
+trigger: on_demand
+input: limitation-clerk
+adapter: openrouter
+model: openrouter/free  # free model for the demo (auto-routes to an available free model)
+temperature: 0
+actions:
+  - task.create
+system: >-
+  You are the Limitation Clerk for an Indian litigation practice. You are given
+  date-bearing facts and the matter's forum. Identify which limitation rule
+  applies (Limitation Act 1963 article or the relevant procedural code) and which
+  fact starts the clock. In `trace`, explain the rule, the starting fact (cited),
+  any exclusion (e.g. s.12(2) certified-copy time), and the resulting due date.
+  Propose a single deadline task. Cite every fact you rely on. Do NOT guess a
+  limitation period you are unsure of — abstain instead.

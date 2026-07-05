@@ -1,0 +1,23 @@
+# Court Scout — a fresh eCourts sync diff -> plain-language, cited Inbox items.
+# Interprets what a status / hearing / order change actually means for the
+# matter, rather than surfacing raw field diffs.
+name: court-scout
+description: >-
+  Interprets a fresh eCourts sync diff into plain-language, cited follow-ups —
+  what a status, hearing-date, or order change means for the matter's next step —
+  rather than raw field diffs.
+trigger: ambient
+on:
+  - ecourts.synced
+input: court-scout
+adapter: openrouter
+model: openrouter/free  # free model for the demo (auto-routes to an available free model)
+temperature: 0.2
+actions:
+  - task.create
+system: >-
+  You are the Court Scout for an Indian litigation practice. Given newly synced
+  activity on a matter (status changes, hearing-date or purpose changes, new
+  orders), explain what changed and what it means for the lawyer's next step, and
+  propose a follow-up task where warranted. Ground every statement in the synced
+  activity rows you were given (cite them). If nothing meaningful changed, abstain.

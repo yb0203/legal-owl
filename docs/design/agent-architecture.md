@@ -34,18 +34,29 @@ apps/web/lib/
     <action-name>.ts    one file per registered action (e.g. task-create.ts), each calling
                          defineAction and register()
 
+  ai/
+    openrouter.ts       host-agnostic model client (fetch → OpenRouter; the model is a config
+                         string, e.g. "anthropic/claude-sonnet-5"); reads OPENROUTER_API_KEY
   agents/             the agent primitive + orchestration
     define-agent.ts     defineAgent, AgentContext, AgentResult, AnyAgent, AgentTrigger —
                          agents are READ-ONLY; the only mutation channel is a Proposal
     proposal.ts         re-exports ProposalSchema/Proposal from lib/schemas verbatim +
                          createProposal (the one way an agent mints a Proposal)
-    registry.ts         the one agent registry: the `agents` const map + getAgent /
-                         listAgents / listAgentsByTrigger
+    config.ts           AgentConfigSchema — the YAML contract (name, trigger, model, adapter,
+                         input, system prompt, actions)
+    inputs.ts           the input-schema registry: a YAML `input:` key → real Zod schema
+    defs/<name>.yaml    ONE FILE PER AGENT — the declarative definition (this is where agents
+                         are added), e.g. intake-registrar.yaml, limitation-clerk.yaml
+    adapters/           pluggable execution backends (host-agnostic)
+      types.ts            the AgentAdapter interface (config + input → Proposal)
+      openrouter.ts       the default adapter: prompt → OpenRouter → validated Proposal
+      index.ts            registerAdapter / getAdapter (+ built-in registration)
+    load.ts             reads defs/*.yaml, validates, resolves input schema + adapter, builds
+                         each Agent via defineAgent (lazy, memoized)
+    registry.ts         getAgent / listAgents / listAgentsByTrigger — backed by load.ts
     orchestrator.ts     route() (sidebar picker), ask() (run one agent + gate), runAmbient()
                          (event fan-out), emitProposal() (Proposal → Inbox), and the render
                          gate (gateProposal / gateProposals / hasCitations)
-    agents/<name>.ts    one file per specialist agent (e.g. limitation-clerk.ts,
-                         intake-registrar.ts), each calling defineAgent
 ```
 
 ## Data flow: facts → agents → proposals → Inbox → actions
@@ -60,8 +71,8 @@ apps/web/lib/
    / `tasks` / `documents` / `matters`) or a `span` ref (a raw char-offset range into a
    document). This is the one shape shared by the `citations` table, `messages.metadata`,
    and every `Proposal.citations` array.
-3. **Agents read, never write.** A specialist agent (`apps/web/lib/agents/agents/<name>.ts`,
-   built with `defineAgent` from `apps/web/lib/agents/define-agent.ts`) is handed an
+3. **Agents read, never write.** A specialist agent (declared in
+   `apps/web/lib/agents/defs/<name>.yaml`, built via `defineAgent`) is handed an
    `AgentContext` whose `supabase` client is READ-ONLY by convention — it queries facts,
    activity, matters, documents — and returns an `AgentResult`: a schema-validated `output`
    plus zero or more `Proposal`s, each minted via `createProposal`
@@ -107,20 +118,33 @@ citations ledger (CitationRef) ┼─► agents (read-only) ─► Proposal (cre
 
 ## How to add a new agent
 
-1. Create `apps/web/lib/agents/agents/<name>.ts`. Call `defineAgent` from
-   `apps/web/lib/agents/define-agent.ts` with an `input`/`output` Zod schema pair, a
-   `trigger` (`"ambient" | "on_demand" | "sidebar"`), and a `run(input, ctx)` body that
-   returns `{ output, proposals }`. Mint every proposal via `createProposal`
-   (`apps/web/lib/agents/proposal.ts`) with ≥1 `CitationRef` — an uncited proposal is
+Agents are declared in YAML — no code per agent.
+
+1. Add its input contract to `apps/web/lib/agents/inputs.ts`: a Zod schema under a new key in
+   `AGENT_INPUTS` (agent inputs always carry a `matter_id`).
+2. Drop `apps/web/lib/agents/defs/<name>.yaml` with `name`, `description`, `trigger`
+   (`"ambient" | "on_demand" | "sidebar"`), `input` (the key from step 1), `model` (an
+   OpenRouter id), `system` (the prompt + grounding/citation rules), and `actions` (the
+   dot-namespaced typed-action names it may propose). For `ambient`, add `on: [...]`
+   (`"ecourts.synced" | "document.uploaded" | "task.completed"`); for `sidebar`, add
+   `routes: [...]` (path prefixes, e.g. `"/matters"`).
+3. That's it — the loader (`apps/web/lib/agents/load.ts`) picks it up and the registry /
+   `route()` / `ask()` / `runAmbient()` see it automatically. The adapter (default
+   `openrouter`) turns the prompt into a validated, cited Proposal; an uncited proposal is
    dropped by the render gate regardless.
-2. Register it: import it into `apps/web/lib/agents/registry.ts` and add one line to the
-   `agents` const map (key = the agent's own `name`). `AgentName` and every `route()` /
-   `ask()` / `runAmbient()` call site pick it up automatically — no other file changes.
-3. If `trigger: "ambient"`, list the event(s) it subscribes to via `on: [...]`
-   (`"ecourts.synced" | "document.uploaded" | "task.completed"`); `runAmbient()` will
-   dispatch to it on the next matching event.
-4. If `trigger: "sidebar"`, set `routes: [...]` (path prefixes, e.g. `"/matters"`) so
-   `route()` offers it on matching pages.
+
+### Models & execution backends (host-agnostic)
+
+Every agent's `model:` is any OpenRouter model id, changed per agent in YAML with no code
+change. The demo uses **free models** (`openrouter/free`, which auto-routes to an available
+free model). To run agents on a different platform (Lyzr, CrewAI, n8n, a self-hosted runtime),
+implement `AgentAdapter` (`apps/web/lib/agents/adapters/types.ts`) in a new file,
+`registerAdapter(...)` it in `apps/web/lib/agents/adapters/index.ts`, feed its key via `.env`
+(and the Vercel/Supabase env), and point an agent at it with `adapter: <name>` in its YAML.
+
+**Roadmap:** per-user model selection in Settings — let each lawyer pick the model / tier their
+agents use. The config already carries `model` per agent, so this is a UI plus a per-lawyer
+override layer over the YAML defaults.
 
 ## How to add a new action
 

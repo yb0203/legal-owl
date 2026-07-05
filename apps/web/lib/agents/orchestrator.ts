@@ -14,7 +14,7 @@ import { getSystemStateId } from "@/lib/db";
 import type { AgentContext, AgentResult, AnyAgent } from "@/lib/agents/define-agent";
 import { ProposalSchema, type Proposal } from "@/lib/agents/proposal";
 import type { CitationRef } from "@/lib/schemas";
-import { agents, getAgent, listAgentsByTrigger, type AgentName } from "@/lib/agents/registry";
+import { getAgent, listAgents, listAgentsByTrigger, type AgentName } from "@/lib/agents/registry";
 
 // ── Sidebar routing ──────────────────────────────────────────────────────────
 
@@ -94,9 +94,10 @@ export async function runAmbient(
   const parsedEvent = AmbientEventSchema.parse(event);
   const results: { agent: AgentName; taskIds: string[] }[] = [];
 
-  for (const [name, agent] of Object.entries(agents) as [AgentName, AnyAgent][]) {
+  for (const agent of listAgents()) {
     if (agent.trigger !== "ambient" || !agent.on?.includes(parsedEvent.type)) continue;
 
+    const name = agent.name;
     const taskIds: string[] = [];
     try {
       const result = await agent.invoke(parsedEvent, ctx);
