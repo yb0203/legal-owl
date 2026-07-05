@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createProposal } from "@/lib/agents/proposal";
 import { CitationRefSchema } from "@/lib/schemas";
 import { complete } from "@/lib/ai/openrouter";
+import { resolveSpan } from "@/lib/facts/resolve-span";
 import type { AgentAdapter } from "@/lib/agents/adapters/types";
 import type { AgentConfig } from "@/lib/agents/config";
 
@@ -66,26 +67,28 @@ export const openrouterAdapter: AgentAdapter = {
       );
     }
 
-    // Deterministic span offsets. LLMs cannot count characters reliably, so when
-    // the caller passed the source text and the model returned a verbatim `quote`,
-    // compute the real offsets by searching the document — accurate by construction
-    // (the offsets the model itself emits are discarded). See
-    // docs/design/agent-architecture.md and the LlamaIndex citation pattern.
+    // Deterministic span offsets. LLMs cannot count characters, so when the caller
+    // passed the source text and the model returned a verbatim `quote`, compute the
+    // real offsets by searching the document (resolveSpan) and DISCARD the model's
+    // own offsets. Fail closed: if the quote can't be located, drop the span
+    // citation so the render gate drops an ungrounded proposal rather than emit a
+    // wrong span. See docs/research/llamaindex-span-citation-best-practices.md.
     const docText = (input as { document_text?: unknown } | null)?.document_text;
     const args = out.args as Record<string, unknown>;
     if (typeof docText === "string" && typeof args.quote === "string" && args.quote.length > 0) {
-      const idx = docText.indexOf(args.quote);
-      if (idx >= 0) {
-        const start = idx;
-        const end = idx + args.quote.length;
-        args.start_offset = start;
-        args.end_offset = end;
+      const span = resolveSpan(docText, args.quote);
+      if (span) {
+        args.start_offset = span.start;
+        args.end_offset = span.end;
         for (const cite of out.citations) {
           if (cite.kind === "span") {
-            cite.start_offset = start;
-            cite.end_offset = end;
+            cite.start_offset = span.start;
+            cite.end_offset = span.end;
           }
         }
+      } else {
+        // Quote didn't resolve — never fabricate a span; drop span citations.
+        out.citations = out.citations.filter((cite) => cite.kind !== "span");
       }
     }
 
