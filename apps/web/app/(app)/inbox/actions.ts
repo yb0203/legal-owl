@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { nextKey, getSystemStateId } from "@/lib/db";
+import { get } from "@/lib/actions/define-action";
+import "@/lib/actions/fact-create"; // registers fact.create so approving an intake proposal runs it
 
 async function authed() {
   const supabase = await createClient();
@@ -23,11 +25,39 @@ export async function acceptTriageItem(formData: FormData) {
   const triageId = await getSystemStateId(supabase, "Triage");
   const { data: item } = await supabase
     .from("tasks")
-    .select("id, key, state_id")
+    .select("id, key, state_id, attributes")
     .eq("id", itemId)
     .eq("type", "task")
     .maybeSingle();
   if (!item || item.state_id !== triageId) return;
+
+  // Agent proposals carry attributes.proposal — approving one EXECUTES its typed
+  // action (approve-before-act) and closes the item as Done. A bad/unknown action
+  // falls through to a plain accept so it can never brick the Inbox.
+  const proposal = (item.attributes as { proposal?: { action?: string; args?: Record<string, unknown> } } | null)?.proposal;
+  if (proposal?.action) {
+    try {
+      const result = await get(proposal.action).execute(proposal.args ?? {}, {
+        supabase,
+        user,
+        source: "agent-proposal",
+      });
+      if (!result.ok) throw new Error(result.error.message);
+      const doneId = await getSystemStateId(supabase, "Done");
+      await supabase
+        .from("tasks")
+        .update({
+          state_id: doneId,
+          key: item.key ?? (await nextKey(supabase, "tasks", "T-")),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", itemId);
+      revalidatePath("/", "layout");
+      return;
+    } catch (err) {
+      console.error("[acceptTriageItem] proposal execution failed:", err);
+    }
+  }
 
   const todoId = await getSystemStateId(supabase, "To-Do");
   await supabase

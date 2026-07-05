@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCase, getEnums } from "@/lib/ecourts/client";
 import { normalizeCase } from "@/lib/ecourts/normalize";
 import { syncMatter } from "@/lib/ecourts/sync";
+import { ask, emitProposal } from "@/lib/agents/orchestrator";
 
 const DEMO_CLIENT_TAG = "Sample data — added by “See it in action”.";
 // Demo labels are shared with the real `labels` table, so they're cleared by
@@ -398,5 +399,76 @@ export async function clearSampleData() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   await clearDemo(supabase, user.id);
+  revalidatePath("/", "layout");
+}
+
+// ── Demo: the agentic loop end-to-end ────────────────────────────────────────
+// Reads a demo court order with the (free-model) Intake Registrar and files its
+// span-cited fact proposal into the Inbox. Approving it there
+// (app/(app)/inbox/actions.ts#acceptTriageItem) executes fact.create → a verified
+// fact on the matter. This is the whole approve-before-act loop in one click.
+const SHARMA_ORDER = `IN THE HIGH COURT OF DELHI AT NEW DELHI
+W.P.(CRL) 234 of 2025
+Rakesh Sharma ... Petitioner
+versus
+State of Delhi ... Respondent
+ORDER dated 15.07.2025
+Issue notice to the respondent. The petitioner seeks quashing of FIR No. 112 of 2025 registered at P.S. Saket. List the matter on 09.09.2025 for hearing on the bail application. The petitioner shall file the certified copy of the impugned order within thirty days.`;
+
+export async function runDemoIntake() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const lawyer_id = user.id;
+
+  // The demo "Sharma vs State of Delhi" matter (seeded by "See it in action").
+  const { data: matter } = await supabase
+    .from("matters")
+    .select("id")
+    .eq("lawyer_id", lawyer_id)
+    .eq("key", "DEMO-2")
+    .maybeSingle();
+  if (!matter) return;
+
+  const DOC_NAME = "Order dated 15-07-2025.pdf";
+  let { data: doc } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("matter_id", matter.id)
+    .eq("name", DOC_NAME)
+    .maybeSingle();
+  if (!doc) {
+    const inserted = await supabase
+      .from("documents")
+      .insert({
+        lawyer_id,
+        matter_id: matter.id,
+        name: DOC_NAME,
+        storage_path: `${lawyer_id}/${matter.id}/demo-order.txt`,
+        mime_type: "text/plain",
+        source: "court_order",
+      })
+      .select("id")
+      .single();
+    doc = inserted.data;
+  }
+  if (!doc) return;
+
+  const result = await ask(
+    "intake-registrar",
+    {
+      matter_id: matter.id,
+      document_id: doc.id,
+      document_name: DOC_NAME,
+      document_text: SHARMA_ORDER,
+    },
+    { supabase, user },
+  );
+
+  for (const proposal of result.proposals) {
+    await emitProposal(supabase, lawyer_id, proposal);
+  }
   revalidatePath("/", "layout");
 }

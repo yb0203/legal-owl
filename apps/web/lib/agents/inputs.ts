@@ -21,6 +21,10 @@ export const AGENT_INPUTS = {
   "intake-registrar": z.object({
     matter_id: z.uuid(),
     document_id: z.uuid(),
+    // Assembled context — a caller / context-assembler fills these with the
+    // document to read (until an OCR/ingestion pipeline stores extracted text).
+    document_name: z.string().optional(),
+    document_text: z.string().optional(),
   }),
   "limitation-clerk": z.object({
     matter_id: z.uuid(),
