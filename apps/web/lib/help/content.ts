@@ -16,6 +16,7 @@ export const HELP_ANCHORS = [
   "settings",
   "glossary",
   "faq",
+  "whats-next",
 ] as const;
 
 export type HelpAnchor = (typeof HELP_ANCHORS)[number];
@@ -241,6 +242,21 @@ Your data is **isolated to you** — only you can see your clients and matters (
 **Are hearings and deadlines separate from tasks?** No — they're tasks with a date and a type. That's why one list, one Calendar, and one set of badges cover everything you do on a case.
 
 **How do I sign in?** Sign-in is passwordless — enter your email and we'll send a one-time link and code. There's no password to remember or reset.
+`,
+  },
+
+  {
+    id: "whats-next",
+    title: "What's coming",
+    group: "Reference",
+    body: `
+Legal Owl is in early access, and the next chapter is a **case-grounded AI layer** — built so every answer is traceable to your real case data, never generic AI. These are in active development; this page will grow as they land.
+
+- **An always-present assistant** in a right-hand sidebar that knows the matter and task you're on and answers only from your record — with a **citation on every claim**. If it can't cite it from your file, it won't say it.
+- **Best-practice checklists on your work** — tasks gain optional **Acts** (the steps to take) and **Checks** (best-practice gates), drawn from a layered playbook: your jurisdiction, your firm, and your own preferences.
+- **Intake that reads your files** — drop a case file and it extracts the key facts, dates, and parties, each linked back to the exact page it came from.
+
+Everything the assistant proposes is **approve-before-act**: it drafts and suggests; you review, edit, and approve. Legal-critical dates (like limitation) are computed by rules, never guessed.
 `,
   },
 ];

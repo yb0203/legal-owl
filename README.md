@@ -93,18 +93,30 @@ DB password); these are gitignored. Database schema is in [`supabase/migrations/
 The production app (Next.js + Supabase, deployed on Vercel) is built foundation-first. **Shipped:**
 
 - **App shell** — responsive sidebar + header, ⌘K command palette, global "New" menu, off-dark theme.
-- **Case management (the foundation)** — Clients → Engagements → Matters → Actions. Client intake
-  with an advisory conflict check; the **Matter** case file (pinned header, editable details,
-  parties, unified timeline of court events + remarks, Tasks, Hearings + outcomes, Deadlines,
-  Documents).
+- **Case management (the foundation)** — **Client → Matter → Task** (task-first, Linear-inspired).
+  Client intake with an advisory conflict check; the **Matter** case file (pinned header, editable
+  details, parties, one unified **activity** timeline of court events + remarks, Tasks, Hearings +
+  outcomes, Deadlines, Documents). Hearings and deadlines are just typed tasks with a date.
 - **Workflow** — cross-matter **Tasks** (filters, inline edit) and an **Inbox** (court-update triage:
   accept-as-task with priority/due, snooze-to-day-before-hearing, dismiss).
+- **Court monitoring** — **live eCourts sync** (connect a matter by CNR, "Sync now", a nightly cron)
+  that diffs the portal and lands new court events on the timeline and as Inbox items.
 - **Calendar** — agenda of upcoming hearings + deadlines across all matters.
 - **Documents** — per-matter upload to a private Supabase Storage bucket (signed-URL download).
-- **Auth** — email/password with a waitlist `has_access` gate. RLS per `lawyer_id` throughout.
+- **Auth** — passwordless magic-link + 6-digit code (via Resend), behind a waitlist `has_access`
+  gate. RLS per `lawyer_id` throughout.
 - **Onboarding** — a "See it in action" toggle that seeds/clears realistic demo data.
 
-**Not yet built (deferred per strategy):** live eCourts sync (court events are currently
-demo-seeded), the AI layer (Model + Lawyer Assist), and the client-facing Client Notifs portal.
+**Foundation laid (in code, not yet user-facing):** the **agent-grounding layer** — a schema-locked,
+approve-before-act agent platform (`apps/web/lib/agents/`), a define-once **typed-action** primitive
+(`apps/web/lib/actions/`), zod entity + citation **schemas** (`apps/web/lib/schemas/`), and a drafted
+migration for the **facts** store, **Act/Check** sub-tasks, the **citation ledger**, and a layered
+**playbook** (state/firm/personal). See
+[`docs/design/agent-architecture.md`](./docs/design/agent-architecture.md) and the requirements in
+[`docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md`](./docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md).
+
+**Not yet built:** the AI agent surfaces (the case-grounded sidebar assistant, matter-init ingestion
++ Verification Bench, the deterministic limitation engine), the Act/Check UI, and the client-facing
+Client Notifs portal. The grounding migration is drafted but not applied.
 
 See [`CLAUDE.md`](./CLAUDE.md) for build commands, conventions, and architecture notes for the app.

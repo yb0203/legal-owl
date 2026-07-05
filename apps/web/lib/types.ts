@@ -236,3 +236,189 @@ export interface Label {
   name: string;
   color: string | null;
 }
+
+// ── Agent grounding layer: facts, acts/checks, citations, playbook ───────────
+// Mirrors supabase/migrations/20260705000001_agent_grounding_layer.sql
+
+// ── Facts (extracted, citeable facts with span provenance) ──────────────────
+export const FACT_STATUSES = ["proposed", "verified"] as const;
+export type FactStatus = (typeof FACT_STATUSES)[number];
+
+/** Canonical typed payload stored in facts.value. */
+export type FactValue =
+  | { kind: "text"; text: string }
+  | { kind: "number"; number: number; unit?: string }
+  | { kind: "date"; date: string } // ISO yyyy-mm-dd
+  | { kind: "money"; amount: number; currency: string } // currency 'INR' etc.
+  | { kind: "boolean"; value: boolean };
+
+/**
+ * A raw `facts` row — self-citing: its own (document_id, start_offset,
+ * end_offset) span IS the citation for this row (see lib/citations.ts
+ * factToSpanRef). Downstream assertions cite a fact via a RecordRef instead
+ * of re-deriving its span.
+ */
+export interface Fact {
+  id: string;
+  lawyer_id: string;
+  matter_id: string;
+  document_id: string;
+  start_offset: number; // inclusive char offset into the document's extracted text
+  end_offset: number; // exclusive
+  fact_type: string; // open vocabulary: party_name, filing_date, claim_amount, ...
+  value: FactValue;
+  value_text: string; // denormalised, always-renderable display string
+  confidence: number; // 0..1
+  status: FactStatus;
+  verified_at: string | null;
+  source_rank: number; // authority of source doc; lower = more authoritative
+  extractor_version: string; // e.g. 'fact-extractor@2026-07-01'
+  created_at: string;
+}
+
+// ── task_steps: Acts + Checks under a task ───────────────────────────────────
+export const STEP_KINDS = ["act", "check"] as const;
+export type StepKind = (typeof STEP_KINDS)[number];
+
+export const CHECK_RESULTS = ["pass", "fail", "na"] as const;
+export type CheckResult = (typeof CHECK_RESULTS)[number];
+
+export const STEP_SOURCES = ["manual", "playbook", "assistant"] as const;
+export type StepSource = (typeof STEP_SOURCES)[number];
+
+interface TaskStepBase {
+  id: string;
+  lawyer_id: string;
+  task_id: string; // steps die with the task
+  title: string;
+  description: string | null;
+  position: number; // manual ordering within task+kind
+  source: StepSource;
+  playbook_item_id: string | null; // best-practice source ref
+  source_note: string | null; // free-text authority when no playbook item
+  created_at: string;
+}
+
+/** A `task_steps` row with kind='act' — a do-step; completed_at null = open. */
+export interface Act extends TaskStepBase {
+  kind: "act";
+  completed_at: string | null;
+  result: null;
+  evaluated_at: null;
+}
+
+/** A `task_steps` row with kind='check' — a QA gate; result null = not yet evaluated. */
+export interface Check extends TaskStepBase {
+  kind: "check";
+  completed_at: null;
+  result: CheckResult | null;
+  evaluated_at: string | null;
+}
+
+/** A raw `task_steps` row (either flavour) — narrow on `kind` to get Act | Check. */
+export type TaskStep = Act | Check;
+
+// ── citations: THE ledger ────────────────────────────────────────────────────
+export const CITATION_REF_KINDS = ["record", "span"] as const;
+export type CitationRefKind = (typeof CITATION_REF_KINDS)[number];
+
+export const CITATION_RECORD_TABLES = ["fact", "activity", "task", "document", "matter"] as const;
+export type CitationRecordTable = (typeof CITATION_RECORD_TABLES)[number];
+
+export const CITATION_SUBJECTS = ["message", "fact", "activity", "task", "task_step"] as const;
+export type CitationSubject = (typeof CITATION_SUBJECTS)[number];
+
+/** Points at a whole DB row the lawyer can open. */
+export type RecordRef = {
+  kind: "record";
+  table: CitationRecordTable;
+  id: string; // uuid of the row
+};
+
+/** Points at a byte range inside a document's extracted text. */
+export type SpanRef = {
+  kind: "span";
+  document_id: string;
+  start_offset: number; // inclusive
+  end_offset: number; // exclusive; > start_offset
+};
+
+export type CitationRef = RecordRef | SpanRef;
+
+/** A raw `citations` row — the flattened record-ref | span-ref union, grouped by claim_id. */
+export interface Citation {
+  id: string;
+  lawyer_id: string;
+  matter_id: string;
+  subject_type: CitationSubject; // which table holds the claim
+  subject_id: string; // polymorphic; no FK (taggings pattern)
+  claim_id: string; // the specific assertion
+  position: number; // order of citations under one claim
+  ref_kind: CitationRefKind;
+  ref_table: CitationRecordTable | null; // record-ref only
+  ref_id: string | null; // record-ref only; polymorphic, no FK
+  document_id: string | null; // span-ref only
+  start_offset: number | null; // span-ref only
+  end_offset: number | null; // span-ref only
+  quote: string | null; // cached excerpt for hover-render
+  created_at: string;
+}
+
+/** `messages.metadata.claims` shape — joins a text range in a UIMessage part to citations.claim_id. */
+export interface MessageClaimMap {
+  claims?: Array<{
+    claim_id: string; // joins citations.claim_id
+    part: number; // index into parts[]
+    start: number; // char range within that text part
+    end: number;
+  }>;
+}
+
+// ── playbook_items: layered State | Firm | Personal repo ────────────────────
+export const PLAYBOOK_SCOPES = ["state", "firm", "personal"] as const;
+export type PlaybookScope = (typeof PLAYBOOK_SCOPES)[number];
+
+export const PLAYBOOK_KINDS = ["rule", "checklist", "template"] as const;
+export type PlaybookKind = (typeof PLAYBOOK_KINDS)[number];
+
+/** playbook_items.spec payload, shaped by `kind`. */
+export type PlaybookSpec =
+  | {
+      kind: "rule"; // deterministic; feeds the rule engine
+      when: Record<string, unknown>; // condition tree over task/matter/fact fields
+      then: Record<string, unknown>; // effects: create deadline task, set priority, raise check...
+    }
+  | {
+      kind: "checklist"; // default acts/checks fanned into task_steps on apply
+      acts: Array<{ title: string; description?: string }>;
+      checks: Array<{ title: string; description?: string; source_note?: string }>;
+    }
+  | {
+      kind: "template"; // drafts
+      format: "markdown";
+      body: string;
+      variables: string[]; // e.g. ['matter.title', 'client.display_name']
+    };
+
+/**
+ * A raw `playbook_items` row. Override resolution for a slug (personal > firm
+ * > state, most-specific applicability match wins within a layer) lives in
+ * lib/playbook.ts — never by merging specs across layers.
+ */
+export interface PlaybookRule {
+  id: string;
+  scope: PlaybookScope;
+  lawyer_id: string | null; // null iff scope='state' (global/system rows)
+  firm_id: string | null; // forward slot; no firms table yet
+  kind: PlaybookKind;
+  slug: string; // stable identity across layers (the override chain key)
+  title: string;
+  description: string | null;
+  forum_type: ForumType | null; // applicability filter; null = any forum
+  task_type: TaskType | null; // applicability filter; null = any task type
+  spec: PlaybookSpec;
+  source_ref: string | null; // authority citation for state rows
+  enabled: boolean; // disabled personal/firm rows still shadow lower layers
+  created_at: string;
+  updated_at: string;
+}
