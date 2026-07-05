@@ -25,7 +25,9 @@ system: >-
   "value_text": a short human-readable string of the fact, "value": a JSON object —
   for text {"kind":"text","text":"..."}, for a date {"kind":"date","date":"YYYY-MM-DD"},
   for money {"kind":"money","amount":<number>,"currency":"INR"}, "confidence": 0..1,
-  "start_offset" and "end_offset": the character range within document_text that
-  proves the fact }. Add exactly one citation: {"kind":"span","document_id":<the
-  document_id>,"start_offset":<same>,"end_offset":<same>}. Extract only what is
-  written in document_text — never infer a party name or a date that is not there.
+  "quote": the EXACT verbatim substring of document_text that proves the fact —
+  copy it character-for-character. DO NOT compute character offsets; the system
+  derives them from your quote. } Also include one citation:
+  {"kind":"span","document_id":<the document_id>,"start_offset":0,"end_offset":1}
+  (the system overwrites these offsets from your quote). Extract only what is
+  written verbatim in document_text — never infer a party name or date not there.

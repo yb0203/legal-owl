@@ -66,6 +66,29 @@ export const openrouterAdapter: AgentAdapter = {
       );
     }
 
+    // Deterministic span offsets. LLMs cannot count characters reliably, so when
+    // the caller passed the source text and the model returned a verbatim `quote`,
+    // compute the real offsets by searching the document — accurate by construction
+    // (the offsets the model itself emits are discarded). See
+    // docs/design/agent-architecture.md and the LlamaIndex citation pattern.
+    const docText = (input as { document_text?: unknown } | null)?.document_text;
+    const args = out.args as Record<string, unknown>;
+    if (typeof docText === "string" && typeof args.quote === "string" && args.quote.length > 0) {
+      const idx = docText.indexOf(args.quote);
+      if (idx >= 0) {
+        const start = idx;
+        const end = idx + args.quote.length;
+        args.start_offset = start;
+        args.end_offset = end;
+        for (const cite of out.citations) {
+          if (cite.kind === "span") {
+            cite.start_offset = start;
+            cite.end_offset = end;
+          }
+        }
+      }
+    }
+
     const proposal = createProposal({
       agent: config.name,
       action: out.action,

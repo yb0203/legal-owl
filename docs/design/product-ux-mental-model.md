@@ -8,7 +8,7 @@ last_updated: 2026-07-05
 
 **Premise.** A solo Indian litigator already runs the system we built — they just run it on paper. The brief (file), the munshi (clerk who puts things up), the order sheet (append-only record), the advocate's diary (dates), the board (cause list). Our job is not to teach them a schema; it is to let them recognise their own office. Every naming and layout decision below is held to that test: *would the lawyer recognise this from their chamber?*
 
-**One structural decision up front.** The 2026-06-23 layout decision (single column, `max-w-3xl`, no side rails) stands. The "always-present right-sidebar assistant" is therefore **not a persistent pane**: it is a summonable overlay drawer (⌘J / an "Ask Owl" affordance in the header) that slides over the right edge and dismisses back to a slim presence — a floating owl mark carrying a count of pending proposals *for the current scope*. Present, never resident. This resolves the foundation's "always-present" requirement without re-cluttering the reading column the user explicitly flattened.
+**One structural decision up front (owner decision, 2026-07-05).** The right-hand agentic assistant is a **persistent, resident pane** — always visible alongside the work, not a summonable overlay. This revises the earlier single-column-only stance (2026-06-23): on wide screens the reading column narrows to make room for a fixed assistant rail; on narrow/mobile viewports the rail collapses to a summonable drawer (⌘J / an "Ask Owl" affordance) so small screens still get their full reading width. The pane always shows the scope chip (§2), so what the assistant can read is visible at all times. `⌘.` toggles it for lawyers who want the width back.
 
 ---
 
@@ -163,4 +163,4 @@ FOOTER
 
 ---
 
-**Risks to watch:** pin density in chat (cap visible pins per paragraph, collapse to a trailing "3 sources"); Bench fatigue on large bundles (batch-verify high-confidence facts by document); the Inbox becoming two products in one queue (keep the two voices visually distinct via the triad chips but behaviourally identical); and the temptation to make the assistant drawer resident on wide screens — hold the single-column line until the owner revisits it.
+**Risks to watch:** pin density in chat (cap visible pins per paragraph, collapse to a trailing "3 sources"); Bench fatigue on large bundles (batch-verify high-confidence facts by document); the Inbox becoming two products in one queue (keep the two voices visually distinct via the triad chips but behaviourally identical); and the resident assistant rail (owner's decision) eating the reading column on smaller laptops — narrow the rail gracefully and collapse it to a drawer below a breakpoint rather than squeezing the case file.

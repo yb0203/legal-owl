@@ -70,7 +70,7 @@ The core never mutates domain tables. Its only writes are `conversations`/`messa
 
 ## 2. The in-app sidebar
 
-**Placement.** A collapsible right panel mounted in `app/(app)/layout.tsx` (a `Panel`-derived shell, not hand-rolled), summonable via the existing cmdk palette and `Cmd+.`. Content streams through `app/api/assistant/route.ts` (AI SDK `useChat`, UIMessage parts) — the web renderer of the same `runTurn`. *(Reconcile with the single-column layout decision: see `docs/design/product-ux-mental-model.md` — a summonable overlay drawer, not a resident pane.)*
+**Placement.** A **persistent right pane** mounted in `app/(app)/layout.tsx` (a `Panel`-derived shell) — always visible on wide screens, collapsing to a summonable drawer on narrow/mobile viewports (owner decision, 2026-07-05). `Cmd+.` toggles it. Content streams through `app/api/assistant/route.ts` (AI SDK `useChat`, UIMessage parts) — the web renderer of the same `runTurn`.
 
 **Context-awareness = the scope chip.** The panel header shows a pinned, *visible* scope derived from the route (the existing `RouteContext`): on `/matters/[id]` it shows the matter title + CNR in Geist Mono; on a task it shows the task and its matter. This is the CNR isolation boundary made tangible — the lawyer sees exactly what the assistant can read, and can clear it to portfolio scope (calendar/tasks reads only; document/fact grounding always stays single-matter, matching the DB-level span isolation in the grounding migration). `orchestrator.route(ctx)` picks which sidebar specialists surface as suggestion chips.
 
