@@ -296,6 +296,11 @@ export async function seedSampleData() {
     triageTask(m3, "status_changed", "Petition admitted by NCLT", at(2)),
   ]);
 
+  // ── Agent work (the eCourts → agents loop), put up for approval ─────────────
+  // Shows Owl doing the workflow overnight: Court Scout interprets a court
+  // update, Intake reads the order into a fact, Limitation computes a deadline.
+  await seedAgentWork(supabase, lawyer_id, m2);
+
   // ── Labels (created last so a label issue can't block the core seed) ──────
   const lUrgent = await addLabel("Urgent", "#ef4444");
   const lFiling = await addLabel("Filing", "#3b82f6");
@@ -416,6 +421,105 @@ versus
 State of Delhi ... Respondent
 ORDER dated 15.07.2025
 Issue notice to the respondent. The petitioner seeks quashing of FIR No. 112 of 2025 registered at P.S. Saket. List the matter on 09.09.2025 for hearing on the bail application. The petitioner shall file the certified copy of the impugned order within thirty days.`;
+
+// Seed the agent-driven work an overnight eCourts sync would have produced on the
+// Sharma matter — a Court Scout interpretation, an Intake fact read off the order,
+// and a Limitation deadline — each as an approve-before-act proposal in the Inbox.
+async function seedAgentWork(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lawyerId: string,
+  matterId: string,
+) {
+  const { data: doc } = await supabase
+    .from("documents")
+    .insert({
+      lawyer_id: lawyerId,
+      matter_id: matterId,
+      name: "Order dated 15-07-2025.pdf",
+      storage_path: `${lawyerId}/${matterId}/demo-order.txt`,
+      mime_type: "text/plain",
+      source: "court_order",
+    })
+    .select("id")
+    .single();
+  const docId = doc?.id as string | undefined;
+  if (!docId) return;
+
+  const { data: act } = await supabase
+    .from("activity")
+    .select("id")
+    .eq("matter_id", matterId)
+    .eq("kind", "court_event")
+    .order("occurred_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const quote = "List the matter on 09.09.2025";
+  const span = resolveSpan(SHARMA_ORDER, quote);
+  const spanCite = span
+    ? [{ kind: "span" as const, document_id: docId, start_offset: span.start, end_offset: span.end }]
+    : [];
+
+  if (act?.id) {
+    await emitProposal(
+      supabase,
+      lawyerId,
+      createProposal({
+        agent: "court-scout",
+        action: "task.create",
+        // matter_id parks the proposal on the matter; matterId/priority feed task.create's input.
+        args: { matter_id: matterId, matterId, title: "Prepare final-arguments brief", priority: "high" },
+        citations: [{ kind: "record" as const, table: "activity" as const, id: act.id as string }],
+        trace:
+          "Court status moved to Arguments — the evidence stage has closed. Prepare the final-arguments brief before the next date.",
+        confidence: 0.9,
+      }),
+    );
+  }
+
+  if (spanCite.length) {
+    await emitProposal(
+      supabase,
+      lawyerId,
+      createProposal({
+        agent: "intake-registrar",
+        action: "fact.create",
+        args: {
+          matter_id: matterId,
+          document_id: docId,
+          fact_type: "next_hearing_date",
+          value_text: "09.09.2025",
+          value: { kind: "date", date: "2025-09-09" },
+          confidence: 0.95,
+          quote,
+          start_offset: span?.start ?? 0,
+          end_offset: span?.end ?? 1,
+        },
+        citations: spanCite,
+        trace: "Next hearing date read from the order: “List the matter on 09.09.2025”.",
+        confidence: 0.95,
+      }),
+    );
+    await emitProposal(
+      supabase,
+      lawyerId,
+      createProposal({
+        agent: "limitation-clerk",
+        action: "task.create",
+        args: {
+          matter_id: matterId,
+          matterId,
+          title: "Appeal window closes — 90 days from the order",
+          dueDate: "2025-10-13",
+        },
+        citations: spanCite,
+        trace:
+          "Appeal limitation: 90 days from the order dated 15-07-2025 (Limitation Act 1963, Art. 116) → 13-10-2025.",
+        confidence: 0.9,
+      }),
+    );
+  }
+}
 
 export async function runDemoIntake() {
   const supabase = await createClient();

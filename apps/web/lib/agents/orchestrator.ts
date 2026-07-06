@@ -64,6 +64,16 @@ export const AmbientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("ecourts.synced"),
     matter_id: z.uuid(),
     activity_ids: z.array(z.uuid()),
+    changes: z
+      .array(
+        z.object({
+          event_type: z.string(),
+          previous_value: z.string().nullable().optional(),
+          new_value: z.string().nullable().optional(),
+          occurred_at: z.string().optional(),
+        }),
+      )
+      .optional(),
   }),
   z.object({
     type: z.literal("document.uploaded"),

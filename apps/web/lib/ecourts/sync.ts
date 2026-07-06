@@ -16,6 +16,16 @@ export interface SyncSummary {
   created: number; // new activity rows appended
   hearings: number; // hearing tasks upserted
   triaged: number; // inbox (Triage-state) tasks raised
+  events: SyncEvent[]; // the genuinely-new court_event rows (interactive syncs hand these to agents)
+}
+
+/** A newly-appended court_event row — the payload Court Scout reacts to. */
+export interface SyncEvent {
+  id: string;
+  event_type: string;
+  previous_value: string | null;
+  new_value: string | null;
+  occurred_at: string | null;
 }
 
 interface DerivedEvent {
@@ -80,6 +90,7 @@ export async function syncMatter(
   // rows (ON CONFLICT DO NOTHING), so triage fires once per genuinely-new change.
   let triaged = 0;
   let created = 0;
+  let events: SyncEvent[] = [];
   if (derived.length) {
     const { data: inserted } = await supabase
       .from("activity")
@@ -97,9 +108,17 @@ export async function syncMatter(
         })),
         { onConflict: "matter_id,content_hash", ignoreDuplicates: true },
       )
-      .select("content_hash");
-    const freshHashes = new Set((inserted ?? []).map((r) => r.content_hash as string));
+      .select("id, content_hash, event_type, previous_value, new_value, occurred_at");
+    const rows = inserted ?? [];
+    const freshHashes = new Set(rows.map((r) => r.content_hash as string));
     created = freshHashes.size;
+    events = rows.map((r) => ({
+      id: r.id as string,
+      event_type: r.event_type as string,
+      previous_value: (r.previous_value as string | null) ?? null,
+      new_value: (r.new_value as string | null) ?? null,
+      occurred_at: (r.occurred_at as string | null) ?? null,
+    }));
 
     // Each genuinely-new change becomes a Triage-state task (the Inbox). Keyless;
     // a key is minted on accept. triage_kind drives the Inbox KIND chip.
@@ -178,7 +197,7 @@ export async function syncMatter(
     })
     .eq("id", matter_id);
 
-  return { created, hearings: c.hearings.length, triaged };
+  return { created, hearings: c.hearings.length, triaged, events };
 }
 
 // CNR did not resolve — flag the matter without wiping prior data.

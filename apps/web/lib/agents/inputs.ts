@@ -45,6 +45,18 @@ export const AGENT_INPUTS = {
   "court-scout": z.object({
     matter_id: z.uuid(),
     activity_ids: z.array(z.uuid()),
+    // The synced changes to interpret (the caller/context-assembler fills these
+    // from the new activity rows so the model has content, not just ids).
+    changes: z
+      .array(
+        z.object({
+          event_type: z.string(),
+          previous_value: z.string().nullable().optional(),
+          new_value: z.string().nullable().optional(),
+          occurred_at: z.string().optional(),
+        }),
+      )
+      .optional(),
   }),
 } satisfies Record<string, z.ZodType>;
 

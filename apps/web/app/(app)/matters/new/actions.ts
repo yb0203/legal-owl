@@ -72,7 +72,7 @@ export async function createMatter(formData: FormData) {
         .select("id, lawyer_id, cnr, court_status, next_hearing_date")
         .eq("id", inserted.id)
         .single();
-      if (m) await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1]);
+      if (m) await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1], { react: true });
     } catch {
       /* sync is best-effort; the lawyer can retry via Sync now */
     }

@@ -1,60 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { defineAction, buildActionContext, register } from "@/lib/actions";
-import { nextKey } from "@/lib/db";
+import { buildActionContext } from "@/lib/actions";
+import { createTaskAction } from "@/lib/actions/task-create";
 
-// Quick-create a task from the Tasks surface. A task must belong to a matter
-// (schema requires matter_id), so the composer makes the matter required.
-//
-// The mutation itself lives in `createTaskAction` (a typed action via
-// `defineAction`) so it is reachable from any transport (Server Action here;
-// HTTP / agent-proposal later via the same `execute`). `createQuickTask`
-// stays a thin "use server" wrapper: parse FormData, build the request-scoped
-// ActionContext, call the typed action, revalidate on success.
-
-const CreateTaskInput = z.object({
-  matterId: z.string().min(1),
-  title: z.string().trim().min(1),
-  priority: z.string().optional(),
-  dueDate: z.string().optional(),
-});
-
-interface CreateTaskResult {
-  key: string;
-}
-
-const createTaskAction = defineAction({
-  name: "task.create",
-  description: "Create a manual task on a matter, parked in the To-Do workflow state.",
-  input: CreateTaskInput,
-  async run(args, ctx): Promise<CreateTaskResult | null> {
-    const { data: todo } = await ctx.supabase
-      .from("workflow_states")
-      .select("id")
-      .is("lawyer_id", null)
-      .eq("name", "To-Do")
-      .maybeSingle();
-    if (!todo) return null;
-
-    const key = await nextKey(ctx.supabase, "tasks", "T-");
-    await ctx.supabase.from("tasks").insert({
-      lawyer_id: ctx.user.id,
-      matter_id: args.matterId,
-      type: "task",
-      key,
-      title: args.title,
-      state_id: todo.id,
-      priority: args.priority || "none",
-      due_date: args.dueDate || null,
-      source: "manual",
-    });
-    return { key };
-  },
-});
-
-register(createTaskAction);
+// Quick-create a task from the Tasks surface. The mutation lives in the shared
+// `createTaskAction` typed action (lib/actions/task-create) so it is reachable
+// from any transport (this Server Action, HTTP, or an agent proposal via the
+// Inbox accept path). `createQuickTask` stays a thin "use server" wrapper: parse
+// FormData, build the request-scoped ActionContext, call execute, revalidate.
 
 export async function createQuickTask(formData: FormData) {
   const matterId = String(formData.get("matter_id") || "");

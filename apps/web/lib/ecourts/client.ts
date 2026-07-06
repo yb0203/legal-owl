@@ -81,6 +81,19 @@ export async function bulkRefresh(cnrs: Cnr[]): Promise<Record<string, CaseResul
 
 let enumsCache: Enums | null = null;
 /** Reference enums (court/status/type codes), fetched once and cached per runtime. */
+// Daily cause list (the court's board for a date). Free per the partner docs; the
+// exact query/response shape is pending live verification (see the eCourts audit).
+// Wired forward for the "morning board" Court Scout agent — not consumed in the UI yet.
+export async function getCauseList(params: {
+  date: string; // yyyy-mm-dd
+  courtCode?: string;
+}): Promise<{ ok: boolean; body: unknown }> {
+  const q = new URLSearchParams({ date: params.date });
+  if (params.courtCode) q.set("court", params.courtCode);
+  const { status, body } = await getJson(`/causelist/search?${q.toString()}`);
+  return { ok: status === 200, body };
+}
+
 export async function getEnums(): Promise<Enums | null> {
   if (enumsCache) return enumsCache;
   try {

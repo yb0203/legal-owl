@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { nextKey, getSystemStateId } from "@/lib/db";
 import { get } from "@/lib/actions/define-action";
 import "@/lib/actions/fact-create"; // registers fact.create so approving an intake proposal runs it
+import "@/lib/actions/task-create"; // registers task.create so approving a court-scout/limitation proposal runs it
 
 async function authed() {
   const supabase = await createClient();

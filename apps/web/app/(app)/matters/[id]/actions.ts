@@ -16,7 +16,7 @@ export async function syncMatterNow(matterId: string): Promise<RunResult> {
     .eq("id", matterId)
     .maybeSingle();
   if (!m) return { ok: false, reason: "error" };
-  const r = await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1]);
+  const r = await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1], { react: true });
   revalidatePath(`/matters/${matterId}`);
   return r;
 }
