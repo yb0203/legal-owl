@@ -81,14 +81,21 @@ export function AssistantRail() {
       setProposals(d.proposals);
     });
 
-  const ask = () => {
-    if (!q.trim() || thinking) return;
+  const ask = (text?: string) => {
+    const question = (text ?? q).trim();
+    if (!question || thinking) return;
     startThinking(async () => {
-      const a = await askOwl(matterId, q);
+      const a = await askOwl(matterId, question);
       setAnswer(a);
       setQ("");
     });
   };
+
+  const EXAMPLES = [
+    "What's the next hearing?",
+    "What has changed recently?",
+    "Is there a limitation deadline?",
+  ];
 
   if (collapsed) {
     return (
@@ -190,11 +197,30 @@ export function AssistantRail() {
           </section>
         ) : (
           !proposals.length && (
-            <div className="pt-6 text-center text-xs text-muted-foreground">
-              <OwlMark className="mx-auto mb-2 size-6 opacity-50" />
-              Ask about this matter — what changed, what&apos;s next, limitation, the last order.
-              <br />
-              Owl answers only from the case file, with sources.
+            <div className="pt-6">
+              <div className="text-center text-xs text-muted-foreground">
+                <OwlMark className="mx-auto mb-2 size-6 opacity-50" />
+                {scope.matterId
+                  ? "Ask about this file — Owl answers only from the record, with sources."
+                  : "Open a case file, then ask Owl — it answers only from that file, with sources."}
+              </div>
+              {scope.matterId && (
+                <div className="mt-3 flex flex-col gap-1.5">
+                  <span className="px-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Try asking
+                  </span>
+                  {EXAMPLES.map((ex) => (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => ask(ex)}
+                      className="rounded-md border border-border px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )
         )}
@@ -219,7 +245,7 @@ export function AssistantRail() {
           <Button
             type="button"
             size="icon"
-            onClick={ask}
+            onClick={() => ask()}
             disabled={thinking || !q.trim()}
             aria-label="Ask Owl"
             className="absolute bottom-2 right-2 size-7"

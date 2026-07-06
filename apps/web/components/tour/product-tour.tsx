@@ -26,6 +26,11 @@ const STEPS: Step[] = [
     body: "Today — Home, Inbox, Tasks, Calendar. Case files — Matters and Clients. Everything you do hangs off a Matter.",
   },
   {
+    selector: '[data-tour="board"]',
+    title: "Your board — most urgent first",
+    body: "Hearings, overdue work, and the inbox are surfaced up top, so you always know what needs you today. A hearing or a deadline is just a task with a date.",
+  },
+  {
     selector: '[data-tour="owl"]',
     title: "Owl, your case assistant",
     body: "Always here on the right. Open a matter and ask anything — Owl answers only from that case file, with sources, and puts actions up for your approval.",
@@ -81,20 +86,24 @@ export function ProductTour() {
   const step = STEPS[i];
   const last = i === STEPS.length - 1;
 
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const clampTop = (t: number) => Math.max(16, Math.min(t, vh - CARD_H - 16));
+
   let cardStyle: CSSProperties;
   if (!rect) {
     cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: CARD_W };
-  } else if (rect.left > window.innerWidth / 2) {
+  } else if (rect.right < vw / 2) {
+    // Target on the left (e.g. the nav) — place the card to its right.
+    cardStyle = { top: clampTop(rect.top), left: rect.right + 16, width: CARD_W };
+  } else if (rect.left > vw / 2) {
     // Target on the right (e.g. the Owl rail) — place the card to its left.
-    cardStyle = {
-      top: Math.max(16, Math.min(rect.top, window.innerHeight - CARD_H - 16)),
-      left: Math.max(16, rect.left - CARD_W - 16),
-      width: CARD_W,
-    };
+    cardStyle = { top: clampTop(rect.top), left: Math.max(16, rect.left - CARD_W - 16), width: CARD_W };
   } else {
+    // Target spanning the middle (e.g. the board) — below, or above if it won't fit.
     const below = rect.bottom + 14;
-    const top = below + CARD_H < window.innerHeight ? below : Math.max(16, rect.top - CARD_H - 14);
-    cardStyle = { top, left: Math.max(16, Math.min(rect.left, window.innerWidth - CARD_W - 16)), width: CARD_W };
+    const top = below + CARD_H < vh ? below : Math.max(16, rect.top - CARD_H - 14);
+    cardStyle = { top, left: Math.max(16, Math.min(rect.left, vw - CARD_W - 16)), width: CARD_W };
   }
 
   return (

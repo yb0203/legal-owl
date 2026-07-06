@@ -140,7 +140,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <section className="mt-6 grid grid-cols-3 gap-4">
+      <section data-tour="board" className="mt-6 grid grid-cols-3 gap-4">
         <Stat label="Open tasks" value={openTasks ?? 0} href="/tasks" />
         <Stat label="Overdue" value={overdueCount} href="/tasks?filter=overdue" tone="urgent" />
         <Stat label="In inbox" value={inboxCount ?? 0} href="/inbox" />
