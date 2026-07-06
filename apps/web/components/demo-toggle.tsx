@@ -14,8 +14,8 @@ export function DemoToggle({ enabled }: { enabled: boolean }) {
       <div>
         <div className="text-sm font-medium">See it in action</div>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Load sample matters, hearings, and tasks to explore the whole app.
-          Turn off any time to remove them.
+          Load a sample practice and take a short guided tour of how everything
+          fits together. Turn off any time to remove it.
         </p>
       </div>
       <Switch

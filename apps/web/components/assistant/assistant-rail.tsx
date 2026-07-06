@@ -112,7 +112,10 @@ export function AssistantRail() {
   }
 
   return (
-    <aside className="hidden w-[360px] shrink-0 flex-col border-l border-border bg-card/40 lg:flex">
+    <aside
+      data-tour="owl"
+      className="hidden w-[360px] shrink-0 flex-col border-l border-border bg-card/40 lg:flex"
+    >
       {/* Header + scope chip */}
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">

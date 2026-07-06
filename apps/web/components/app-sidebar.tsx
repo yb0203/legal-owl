@@ -52,7 +52,7 @@ export function AppSidebar({
         <Wordmark />
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2" data-tour="sidebar">
         {NAV_SECTIONS.map((section) => (
           <SidebarGroup key={section.label}>
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>

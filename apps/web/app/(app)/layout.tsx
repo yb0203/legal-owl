@@ -5,6 +5,7 @@ import { getSystemStateId } from "@/lib/db";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { AssistantRail } from "@/components/assistant/assistant-rail";
+import { ProductTour } from "@/components/tour/product-tour";
 import { SampleDataBanner } from "@/components/sample-data-banner";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
@@ -75,6 +76,7 @@ export default async function AppLayout({
           <AssistantRail />
         </div>
       </SidebarInset>
+      <ProductTour />
     </SidebarProvider>
   );
 }

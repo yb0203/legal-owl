@@ -362,7 +362,7 @@ export async function seedSampleData() {
   }
 
   revalidatePath("/", "layout");
-  redirect("/home");
+  redirect("/home?tour=1");
 }
 
 async function clearDemo(
