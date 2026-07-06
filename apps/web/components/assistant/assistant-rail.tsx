@@ -11,6 +11,7 @@ import {
   PanelRightOpen,
   Loader2,
   Quote,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,11 +92,17 @@ export function AssistantRail() {
     });
   };
 
-  const EXAMPLES = [
+  const MATTER_EXAMPLES = [
     "What's the next hearing?",
     "What has changed recently?",
     "Is there a limitation deadline?",
   ];
+  const PORTFOLIO_EXAMPLES = [
+    "What's on this week?",
+    "Anything overdue?",
+    "Which matters changed recently?",
+  ];
+  const examples = scope.matterId ? MATTER_EXAMPLES : PORTFOLIO_EXAMPLES;
 
   if (collapsed) {
     return (
@@ -145,13 +152,18 @@ export function AssistantRail() {
             <span className="truncate text-xs font-medium">{scope.title}</span>
             <div className="flex items-center gap-1.5">
               <CNRChip cnr={scope.cnr} />
-              <span className="text-[11px] text-muted-foreground">grounded to this file</span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <ShieldCheck className="size-3" /> This file only
+              </span>
             </div>
           </div>
         ) : (
-          <span className="text-[11px] text-muted-foreground">
-            All matters — open a case file to ground Owl to it.
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium">All matters</span>
+            <span className="text-[11px] text-muted-foreground">
+              Your calendar &amp; tasks. Open a case file for its full record.
+            </span>
+          </div>
         )}
       </div>
 
@@ -201,26 +213,24 @@ export function AssistantRail() {
               <div className="text-center text-xs text-muted-foreground">
                 <OwlMark className="mx-auto mb-2 size-6 opacity-50" />
                 {scope.matterId
-                  ? "Ask about this file — Owl answers only from the record, with sources."
-                  : "Open a case file, then ask Owl — it answers only from that file, with sources."}
+                  ? "Ask anything about this file."
+                  : "Ask about your week — or open a case file for its full record."}
               </div>
-              {scope.matterId && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  <span className="px-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Try asking
-                  </span>
-                  {EXAMPLES.map((ex) => (
-                    <button
-                      key={ex}
-                      type="button"
-                      onClick={() => ask(ex)}
-                      className="rounded-md border border-border px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
-                    >
-                      {ex}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="mt-3 flex flex-col gap-1.5">
+                <span className="px-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Try asking
+                </span>
+                {examples.map((ex) => (
+                  <button
+                    key={ex}
+                    type="button"
+                    onClick={() => ask(ex)}
+                    className="rounded-md border border-border px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
             </div>
           )
         )}
@@ -238,7 +248,7 @@ export function AssistantRail() {
                 ask();
               }
             }}
-            placeholder="Ask Owl about this file…"
+            placeholder={scope.matterId ? "Ask about this file…" : "Ask about your matters…"}
             rows={2}
             className="resize-none pr-10 text-sm"
           />
@@ -254,7 +264,7 @@ export function AssistantRail() {
           </Button>
         </div>
         <p className="mt-1 flex items-center gap-1 px-1 text-[10px] text-muted-foreground">
-          <Sparkles className="size-3" /> Grounded in your record — no source, no answer.
+          <Sparkles className="size-3" /> Answers only from your records, with sources.
         </p>
       </div>
     </aside>
