@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatterStatusControl } from "@/components/matter/matter-status";
 import { SyncNowButton } from "@/components/matter/sync-now-button";
+import { CauseListPanel } from "@/components/matter/cause-list-panel";
 import { EditDetailsDialog } from "@/components/matter/edit-details-dialog";
 import { CopyChip } from "@/components/matter/copy-chip";
 import { ConfirmDeleteDocument } from "@/components/matter/confirm-delete-document";
@@ -91,6 +92,7 @@ interface MatterDetail {
   last_successful_sync_at: string | null;
   next_hearing_date: string | null;
   archived_at: string | null;
+  court_hierarchy: { code?: string } | null;
   client: { id: string; display_name: string } | null;
 }
 
@@ -101,7 +103,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const { data: matterRow } = await supabase
     .from("matters")
     .select(
-      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, client:clients(id, display_name)",
+      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, court_hierarchy, client:clients(id, display_name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -146,25 +148,38 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   }
 
   // Single immutable timeline (court events + remarks merged at the source).
-  type TL = { kind: "event" | "remark"; key: string; at: string; label: string; source: EventSource; body?: string };
-  const timeline: TL[] = (activityRows ?? []).map((a): TL =>
-    a.kind === "remark"
-      ? {
-          kind: "remark",
-          key: `r-${a.id}`,
-          at: a.occurred_at ?? a.created_at,
-          label: "Remark",
-          source: a.source,
-          body: a.body ?? "",
-        }
-      : {
-          kind: "event",
-          key: `e-${a.id}`,
-          at: a.occurred_at ?? a.created_at,
-          label: (EVENT_LABELS[a.event_type ?? ""] ?? a.event_type ?? "Update") + (a.new_value ? `: ${a.new_value}` : ""),
-          source: a.source,
-        },
-  );
+  type TL = {
+    kind: "event" | "remark";
+    key: string;
+    at: string;
+    label: string;
+    source: EventSource;
+    body?: string;
+    href?: string;
+  };
+  const timeline: TL[] = (activityRows ?? []).map((a): TL => {
+    if (a.kind === "remark") {
+      return {
+        kind: "remark",
+        key: `r-${a.id}`,
+        at: a.occurred_at ?? a.created_at,
+        label: "Remark",
+        source: a.source,
+        body: a.body ?? "",
+      };
+    }
+    // An order_uploaded event's new_value IS the order's source URL — link to
+    // it directly instead of showing the raw URL as text.
+    const isOrderLink = a.event_type === "order_uploaded" && !!a.new_value && /^https?:\/\//.test(a.new_value);
+    return {
+      kind: "event",
+      key: `e-${a.id}`,
+      at: a.occurred_at ?? a.created_at,
+      label: (EVENT_LABELS[a.event_type ?? ""] ?? a.event_type ?? "Update") + (!isOrderLink && a.new_value ? `: ${a.new_value}` : ""),
+      source: a.source,
+      href: isOrderLink ? a.new_value! : undefined,
+    };
+  });
 
   const parties = matter.parties ?? {};
   const petitioners = parties.petitioners ?? [];
@@ -304,7 +319,19 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
               ) : (
                 <li key={it.key} className="flex items-center gap-3 px-1 py-1 text-sm">
                   <SourceChip source={it.source} />
-                  <span className="flex-1 text-foreground/90">{it.label}</span>
+                  <span className="flex-1 text-foreground/90">
+                    {it.label}
+                    {it.href && (
+                      <a
+                        href={it.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-2 inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2"
+                      >
+                        <FileText className="size-3" /> View order
+                      </a>
+                    )}
+                  </span>
                   <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(it.at)}</span>
                 </li>
               ),
@@ -319,6 +346,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
 
         {/* Hearings */}
         <TabsContent value="hearings" className="mt-4 space-y-4">
+          {matter.court_hierarchy?.code && <CauseListPanel courtCode={matter.court_hierarchy.code} />}
           <form action={addHearing} className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
             <input type="hidden" name="matter_id" value={id} />
             <Input name="hearing_date" type="date" required aria-label="Hearing date" className="w-40" />

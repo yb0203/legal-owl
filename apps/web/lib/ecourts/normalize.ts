@@ -57,6 +57,10 @@ export function normalizeCase(raw: RawCaseData, enums: Enums | null): Normalized
     case_type: describe(enums?.caseType, raw.caseType) ?? raw.caseTypeRaw ?? null,
     court_status: status,
     next_hearing_date: raw.nextHearingDate ? raw.nextHearingDate.slice(0, 10) : null,
+    // Kept for the cause-list lookup (getCauseList's `courtCode` param) — not
+    // otherwise surfaced; already present on the response we fetched, so
+    // carrying it forward costs no extra API call.
+    court_code: raw.cnrCourtCode ?? raw.courtComplexCode ?? null,
     hearings,
     orders,
     lifecycle_hint: disposed ? "disposed" : "active",

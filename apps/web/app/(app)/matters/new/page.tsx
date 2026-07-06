@@ -5,15 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FORUM_TYPES, FORUM_LABELS } from "@/lib/types";
-import { PageShell, BackLink } from "@/components/layout";
+import { PageShell, BackLink, Callout } from "@/components/layout";
 import { NativeSelect } from "@/components/native-select";
+import { CnrLookup } from "@/components/matter/cnr-lookup";
+import Link from "next/link";
 
 export default async function NewMatterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; client?: string }>;
+  searchParams: Promise<{ error?: string; client?: string; manual?: string }>;
 }) {
-  const { error, client } = await searchParams;
+  const { error, client, manual } = await searchParams;
   const supabase = await createClient();
   const { data: clients } = await supabase
     .from("clients")
@@ -21,10 +23,38 @@ export default async function NewMatterPage({
     .order("display_name")
     .returns<{ id: string; display_name: string }[]>();
 
+  const ecourtsConfigured = !!process.env.ECOURTS_API_KEY;
+
+  if (!manual && ecourtsConfigured) {
+    return (
+      <PageShell size="sm">
+        <BackLink href="/matters">Matters</BackLink>
+        <h1 className="mb-1 mt-3 font-serif text-2xl font-semibold tracking-tight">New matter</h1>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Enter the CNR — Legal Owl fetches the case so you can confirm it before creating anything.
+        </p>
+        <CnrLookup clients={clients ?? []} />
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell size="sm">
       <BackLink href="/matters">Matters</BackLink>
-      <h1 className="mb-6 mt-3 font-serif text-2xl font-semibold tracking-tight">New matter</h1>
+      <h1 className="mb-1 mt-3 font-serif text-2xl font-semibold tracking-tight">New matter</h1>
+      {!manual && !ecourtsConfigured && (
+        <Callout tone="urgent" className="mb-4 p-3 text-sm">
+          Court lookup is temporarily unavailable — enter the matter&apos;s details manually below.
+        </Callout>
+      )}
+      {manual && ecourtsConfigured && (
+        <p className="mb-6 text-sm text-muted-foreground">
+          <Link href="/matters/new" className="underline">
+            Look up by CNR
+          </Link>{" "}
+          instead.
+        </p>
+      )}
 
       <form action={createMatter} className="space-y-4">
         <div className="space-y-1.5">

@@ -5,6 +5,43 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nextKey } from "@/lib/db";
 import { syncOneMatter, type RunResult } from "@/lib/ecourts/run";
+import { getCauseList } from "@/lib/ecourts/client";
+
+export type CauseListEntry = Record<string, unknown>;
+export type CauseListResult =
+  | { ok: true; entries: CauseListEntry[] }
+  | { ok: false; reason: "unauthorized" | "error" };
+
+// The response shape isn't confirmed against a live call yet (see the eCourts
+// audit) — try the field names the docs suggest, and fall back to surfacing
+// the raw body as one entry so a mismatch is visible instead of silently empty.
+function extractCauseListEntries(body: unknown): CauseListEntry[] {
+  const b = body as Record<string, unknown> | null;
+  const candidates: unknown[] = [
+    (b?.data as Record<string, unknown> | undefined)?.results,
+    (b?.data as Record<string, unknown> | undefined)?.causelist,
+    (b?.data as Record<string, unknown> | undefined)?.entries,
+    b?.results,
+    b?.causelist,
+    Array.isArray(body) ? body : undefined,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c as CauseListEntry[];
+  }
+  return body ? [{ raw: JSON.stringify(body).slice(0, 2000) }] : [];
+}
+
+// View the day's cause list for this matter's court — explicitly on-demand
+// (a button click), never fetched automatically, so viewing a matter never
+// spends an extra eCourts call by itself.
+export async function viewCauseList(courtCode: string, date: string): Promise<CauseListResult> {
+  const { user } = await authed();
+  if (!user) return { ok: false, reason: "unauthorized" };
+  if (!courtCode || !date) return { ok: false, reason: "error" };
+  const res = await getCauseList({ courtCode, date });
+  if (!res.ok) return { ok: false, reason: "error" };
+  return { ok: true, entries: extractCauseListEntries(res.body) };
+}
 
 // "Sync now" — fetch the matter's CNR from eCourts and diff into its timeline.
 export async function syncMatterNow(matterId: string): Promise<RunResult> {

@@ -101,7 +101,11 @@ The production app (Next.js + Supabase, deployed on Vercel) is built foundation-
 - **Workflow** — cross-matter **Tasks** (filters, inline edit) and an **Inbox** (court-update triage:
   accept-as-task with priority/due, snooze-to-day-before-hearing, dismiss).
 - **Court monitoring** — **live eCourts sync** (connect a matter by CNR, "Sync now", a nightly cron)
-  that diffs the portal and lands new court events on the timeline and as Inbox items.
+  that diffs the portal and lands new court events on the timeline and as Inbox items. **New matter
+  is CNR-first**: the lawyer enters the CNR, Legal Owl fetches the case and shows a confirm card
+  (parties, forum, status) before anything is created — a known gap (finding a case without a CNR
+  yet) is tracked in
+  [`docs/specs/court-monitoring.md`](./docs/specs/court-monitoring.md#mvp-scope-note-2026-07-06--cnr-first-registration-is-what-shipped).
 - **Calendar** — agenda of upcoming hearings + deadlines across all matters.
 - **Documents** — per-matter upload to a private Supabase Storage bucket (signed-URL download).
 - **Auth** — passwordless magic-link + 6-digit code (via Resend), behind a waitlist `has_access`
@@ -127,8 +131,9 @@ and the **eCourts integration audit + leverage plan**
 — how to use the eCourts API so agents drive ~100% of a solo litigator's desk work.
 
 **Not yet built:** the deterministic limitation **rule engine** (dates are still rule-stubbed), order
-**PDF ingestion / OCR** into the facts store (audit P2), the cause-list **morning board** (P1) and
-**search-driven intake** (P3), the **Act/Check** sub-task UI, and the client-facing **Client Notifs**
-portal.
+**PDF ingestion / OCR** into the facts store (audit P2), the cause-list **morning board** (P1),
+**finding a matter without a CNR** (search by party/advocate name or by court + case type + number +
+year — designed, deliberately deferred out of the MVP), the **Act/Check** sub-task UI, and the
+client-facing **Client Notifs** portal.
 
 See [`CLAUDE.md`](./CLAUDE.md) for build commands, conventions, and architecture notes for the app.

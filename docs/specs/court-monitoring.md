@@ -11,6 +11,37 @@ A data acquisition layer that automatically fetches and tracks court case events
 
 ---
 
+## MVP scope note (2026-07-06) — CNR-first registration is what shipped
+
+What's actually built for "New matter" is narrower than the two registration paths designed below,
+and deliberately so: the lawyer enters the **CNR only**. Legal Owl fetches the case
+(`GET /api/partner/case/{cnr}`), shows a confirm card (parties, forum, case type, current status) so
+the lawyer can verify it's the right case, and only then creates the matter — pre-filled from the
+fetch, with the lawyer adding just the internal Title and Client. See **F0** below.
+
+**Known gap, tracked for later (not in this experience yet):** a lawyer who does not already have the
+CNR has no way to find their case in the product today. Both of the richer paths documented as F1
+(search by party/advocate name) and F2 (direct court-hierarchy entry: State → District → Court
+Complex → case type → number → year, with cascading dropdowns off the free court-structure/enum
+endpoints) were designed and partially prototyped, then deliberately shelved out of the MVP —
+`/api/partner/search`'s exact field-level behavior for a hierarchy-style lookup was still pending
+live verification, and the CNR-first path removes that uncertainty entirely for launch. F1/F2 remain
+the intended design for that gap; revisit them once CNR-first registration is validated with real
+lawyers who hit this wall.
+
+- F0. **CNR-direct registration (MVP, shipped)**
+  - **Trigger:** Lawyer has the CNR and creates a new matter.
+  - **Actors:** A1, A2
+  - **Steps:** Lawyer enters the 16-character CNR. Legal Owl calls `/api/partner/case/{cnr}` and shows
+    parties, forum, case type, and current status for confirmation. Lawyer confirms (editing the
+    Title if needed, optionally linking a Client). Legal Owl creates the matter and immediately
+    kicks off a full sync (history, `next_hearing_date`, timeline).
+  - **Covers:** R6, R7, R8, R9, R19 (not R1–R5 — no search or hierarchy-entry step exists yet)
+  - **Fallback:** if eCourts isn't reachable/configured, or the lawyer doesn't have a CNR, they use
+    the plain manual entry form (title/forum/case type/parties typed by hand, CNR optional).
+
+---
+
 ## Problem Frame
 
 Lawyers currently monitor case progress by manually checking the eCourts portal, maintaining Excel sheets with case status, and sending manual client updates. The court portal requires navigating a four-level hierarchy and solving CAPTCHA on every search. For a solo lawyer managing 20–50 active cases, this is a significant daily time drain.
@@ -121,13 +152,13 @@ Legal Owl uses the eCourtsIndia API (`webapi.ecourtsindia.com`) as its data sour
 
 ## Key Flows
 
-- F1. **Case search and registration (search path)**
+- F1. **Case search and registration (search path) — deferred beyond MVP, see the scope note above**
   - **Trigger:** Lawyer does not know the CNR and chooses to search.
   - **Actors:** A1, A2
   - **Steps:** Lawyer enters party name, advocate name, or both with optional filters. Legal Owl calls `/api/partner/search`, displays results. Lawyer selects the correct case. CNR and metadata pre-fill the registration form. Lawyer confirms. Legal Owl fetches full history via `/api/partner/case/{cnr}`, stores events and `next_hearing_date`, marks as registered.
   - **Covers:** R1, R2, R3, R6, R7, R8, R9, R19
 
-- F2. **Direct case registration (hierarchy path)**
+- F2. **Direct case registration (hierarchy path) — deferred beyond MVP, see the scope note above**
   - **Trigger:** Lawyer knows case number and court details.
   - **Actors:** A1, A2
   - **Steps:** Lawyer selects state → district → court complex → establishment (dropdowns from free court structure endpoint) → case type → case number → year. Legal Owl fetches full history via `/api/partner/case/{cnr}`, stores events and `next_hearing_date`, marks as registered.

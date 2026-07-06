@@ -9,7 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const STEPS: [string, string, string][] = [
-  ["01", "Add a matter", "Paste a CNR or search by party name — district court, High Court, NCLT, arbitration."],
+  ["01", "Add a matter", "Enter the CNR — we fetch the case for you to confirm. District court, High Court, NCLT, arbitration."],
   ["02", "We watch the courts", "Daily eCourts sync. Every order, hearing date, and status change is captured."],
   ["03", "Triage into action", "New developments land in an inbox. Accept the ones that need work; the rest stay on the record."],
   ["04", "Keep clients informed", "Turn a court event into a plain-language update. You approve, it sends."],

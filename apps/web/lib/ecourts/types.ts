@@ -4,6 +4,8 @@
 // lib/ecourts_client.py) and are pending live verification (plan U1) — the client
 // reads defensively with fallbacks until a real /case/{cnr} response confirms them.
 
+import type { ForumType, MatterStatus, LifecycleState } from "@/lib/types";
+
 /** A 16-char Case Number Record, e.g. "DLHC010004222025". */
 export type Cnr = string;
 
@@ -60,7 +62,6 @@ export interface Enums {
 }
 
 // ── Normalized domain shapes (what the engine reads) ──────────────────────────
-import type { ForumType, MatterStatus, LifecycleState } from "@/lib/types";
 
 export interface NormalizedHearing {
   hearing_date: string;
@@ -78,6 +79,7 @@ export interface NormalizedCase {
   case_type: string | null;
   court_status: string | null;
   next_hearing_date: string | null;
+  court_code: string | null;
   hearings: NormalizedHearing[];
   orders: NormalizedOrder[];
   lifecycle_hint: LifecycleState;

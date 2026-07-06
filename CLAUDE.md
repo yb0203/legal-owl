@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Claude Code operating discipline (models & token use)
+
+- **Model tiers: Sonnet and Haiku write code; Opus orchestrates; never Fable.** Default to **Sonnet**
+  for implementation — editing files, fixing bugs, and any `Agent`/`Task` dispatch that produces code
+  or writes files. Use **Haiku** for genuinely simple, mechanical, low-risk work — broad exploration
+  (the `Explore` agent), grep-and-quote research, boilerplate/renames, straightforward fixes, or
+  narrow single-purpose verification — and pass `model: "haiku"` explicitly rather than letting it
+  inherit a pricier tier by default. Reserve **Opus** for orchestration, not routine code writing:
+  authoring/running multi-step `Workflow` scripts, coordinating several parallel agents, and the
+  highest-leverage architecture or product calls. **Never dispatch to Fable in this repo** — including
+  from `/ce-brainstorm` or any other skill that defaults to it for "creative" work — use Sonnet
+  instead (Opus only for the rare, genuinely hardest call).
+- **In `Workflow` scripts, set each `agent()`'s `model`/`effort` per stage** rather than letting every
+  call inherit the session model — mechanical/extraction stages get Haiku at `effort: "low"`,
+  implementation stages get Sonnet, and only a true cross-cutting judge/synthesis stage should ever
+  reach for Opus.
+- **Keep the main context lean.** Prefer `Agent(subagent_type: "fork")` for read-heavy investigation
+  (a repo audit, a multi-file trace) so raw tool output stays out of the main conversation and the
+  fork shares the parent's prompt cache; use targeted `Read` (`offset`/`limit`) instead of whole-file
+  reads on large files; `grep`/`glob` before reading blindly; batch independent tool calls into one
+  message; never re-read a file immediately after writing/editing it.
+- **Scale ceremony to the task.** Don't reach for a multi-agent `Workflow` run for work one agent can
+  do — that multiplies token spend and is meant for genuinely large/parallelizable or high-stakes
+  work, not routine edits. Verify cheaply first (`tsc --noEmit`, then a full build) before spending an
+  expensive round-trip (a Chrome screenshot, a fresh multi-file audit) — reach for the pricier check
+  only once the cheap one is green.
+
 ## Repository state
 
 The production app lives in **`apps/web`** (Next.js App Router on Vercel + Supabase in Mumbai). A
