@@ -32,7 +32,8 @@ Owl's core bet. (See the AI layer and grounding/citation-ledger principles in
 
 ### 2. Lawyer Assist
 The LLM harness that assists lawyers with case actions — case-grounded chat, hearing-prep summaries,
-draft generation, and event-triggered client updates. Built on the Vercel AI SDK + AI Gateway, with
+draft generation, and event-triggered client updates. Built on a **host-agnostic model layer**
+(OpenRouter today, with pluggable adapters for other hosts), with
 **citation-ledger provenance** (every assertion links to a source span), **abstention by default**
 ("not in the case file"), and **deterministic** handling of legal-consequential math (limitation /
 hearing dates computed by rules, never generated). Outbound actions default to *approve-before-act*.
@@ -105,18 +106,29 @@ The production app (Next.js + Supabase, deployed on Vercel) is built foundation-
 - **Documents** — per-matter upload to a private Supabase Storage bucket (signed-URL download).
 - **Auth** — passwordless magic-link + 6-digit code (via Resend), behind a waitlist `has_access`
   gate. RLS per `lawyer_id` throughout.
-- **Onboarding** — a "See it in action" toggle that seeds/clears realistic demo data.
+- **Onboarding** — a "See it in action" toggle that seeds realistic demo data and launches a minimal
+  **spotlight product tour** (replayable from Help).
+- **Owl assistant rail** — a persistent, context-aware right sidebar. Scoped to the open matter (and
+  isolated to that case file), it answers questions **only from the record, with sources** (and
+  abstains otherwise), and surfaces agent proposals for approval.
+- **Agent grounding layer (live)** — a span-cited **facts** store + **citation ledger**, schema-locked
+  approve-before-act agents (`apps/web/lib/agents/`), and a define-once **typed-action** primitive
+  (`apps/web/lib/actions/`). An interactive eCourts sync now reaches agents: **Court Scout** turns a
+  court change into a cited proposal, and the demo shows Court Scout, **Intake Registrar** (order →
+  span-cited fact), and **Limitation Clerk** (order date → deadline) proposals — each approvable into a
+  real record.
 
-**Foundation laid (in code, not yet user-facing):** the **agent-grounding layer** — a schema-locked,
-approve-before-act agent platform (`apps/web/lib/agents/`), a define-once **typed-action** primitive
-(`apps/web/lib/actions/`), zod entity + citation **schemas** (`apps/web/lib/schemas/`), and a drafted
-migration for the **facts** store, **Act/Check** sub-tasks, the **citation ledger**, and a layered
-**playbook** (state/firm/personal). See
-[`docs/design/agent-architecture.md`](./docs/design/agent-architecture.md) and the requirements in
-[`docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md`](./docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md).
+**Design + audits:** the agent architecture
+([`docs/design/agent-architecture.md`](./docs/design/agent-architecture.md)), the agent-army
+requirements
+([`docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md`](./docs/brainstorms/2026-07-05-agent-army-grounding-layer-requirements.md)),
+and the **eCourts integration audit + leverage plan**
+([`docs/research/2026-07-06-ecourts-integration-audit.md`](./docs/research/2026-07-06-ecourts-integration-audit.md))
+— how to use the eCourts API so agents drive ~100% of a solo litigator's desk work.
 
-**Not yet built:** the AI agent surfaces (the case-grounded sidebar assistant, matter-init ingestion
-+ Verification Bench, the deterministic limitation engine), the Act/Check UI, and the client-facing
-Client Notifs portal. The grounding migration is drafted but not applied.
+**Not yet built:** the deterministic limitation **rule engine** (dates are still rule-stubbed), order
+**PDF ingestion / OCR** into the facts store (audit P2), the cause-list **morning board** (P1) and
+**search-driven intake** (P3), the **Act/Check** sub-task UI, and the client-facing **Client Notifs**
+portal.
 
 See [`CLAUDE.md`](./CLAUDE.md) for build commands, conventions, and architecture notes for the app.

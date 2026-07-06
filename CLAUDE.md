@@ -54,8 +54,24 @@ Architecture & conventions:
   **`taggings`** is one polymorphic label join (`target_type: task | matter`, no FK on `target_id`).
   `task_relations` replaces action_relations. Documents and `conflict_flags` still hang off Matter.
   Engagements were dropped. A Vercel Chat SDK-aligned `conversations`+`messages` foundation exists
-  (UIMessage `parts`/`metadata` jsonb) but has no UI yet. The single eCourts sync coupling point is
-  `lib/ecourts/sync.ts`.
+  (UIMessage `parts`/`metadata` jsonb) but has no UI yet. The eCourts sync coupling point is
+  `lib/ecourts/sync.ts`; **interactive** syncs (Sync now / connect-by-CNR pass `{react:true}`)
+  additionally fire the `ecourts.synced` ambient event via `lib/agents/react.ts` → `runAmbient` so
+  **Court Scout** turns changes into cited proposals — the nightly cron stays deterministic (no LLM
+  fan-out at scale).
+- **Agent-grounding layer (`lib/agents/` + `lib/actions/`).** Schema-locked, approve-before-act
+  agents ground on a span-cited **`facts`** store + **citation ledger** (migration
+  `20260705000001_agent_grounding_layer.sql`, applied). Every mutation is a define-once **typed
+  action** (`defineAction` → `lib/actions/{fact-create,task-create}.ts`, each `register`ed in a plain
+  module so it resolves in any runtime — NOT a `"use server"` file). An agent proposal is a serialized
+  typed action parked as a Triage task (`source='agent'`, `attributes.proposal`) and **executed on
+  accept** in `inbox/actions.ts` (which imports the action modules so `get(name)` resolves; a bad
+  action falls through to a plain accept so it can't brick the Inbox). Deterministic span offsets: the
+  model returns a verbatim `quote`, code computes offsets via `lib/facts/resolve-span.ts` (never trust
+  model offsets). The persistent **Owl assistant rail** (`components/assistant/assistant-rail.tsx`)
+  answers only from the record with sources (abstains otherwise) and shows proposals for approval; a
+  minimal **spotlight tour** (`components/tour/product-tour.tsx`) launches from the demo toggle
+  (`?tour=1`) and Help.
 - **UI: shadcn on the Base UI registry (NOT Radix).** `components.json` style is `base-nova`,
   base color `neutral`, icons `lucide`. Components use the `render` prop, not `asChild`; Base UI
   `Button`/menu items default to `type="button"` (always set `type="submit"` on form buttons). Add
