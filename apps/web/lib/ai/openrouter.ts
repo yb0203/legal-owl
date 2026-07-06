@@ -35,34 +35,49 @@ function apiKey(): string {
   return key;
 }
 
-/** One chat completion. Returns the assistant message content string. */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * One chat completion, with retries. Free models (openrouter/free) frequently
+ * return 429 (rate-limited upstream) or an empty body; retry those a few times
+ * with backoff before giving up. Returns the assistant message content string.
+ */
 export async function complete(opts: CompleteOptions): Promise<string> {
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    signal: opts.signal,
-    headers: {
-      Authorization: `Bearer ${apiKey()}`,
-      "Content-Type": "application/json",
-      // OpenRouter attribution headers (optional but recommended).
-      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-owl.vercel.app",
-      "X-Title": "Legal Owl",
-    },
-    body: JSON.stringify({
-      model: opts.model,
-      messages: opts.messages,
-      temperature: opts.temperature,
-      max_tokens: opts.maxTokens,
-      response_format: opts.json ? { type: "json_object" } : undefined,
-    }),
+  const key = apiKey();
+  const body = JSON.stringify({
+    model: opts.model,
+    messages: opts.messages,
+    temperature: opts.temperature,
+    max_tokens: opts.maxTokens,
+    response_format: opts.json ? { type: "json_object" } : undefined,
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`OpenRouter ${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
-  }
+  let lastError = "OpenRouter request failed";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      signal: opts.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://legal-owl.vercel.app",
+        "X-Title": "Legal Owl",
+      },
+      body,
+    });
 
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return data.choices?.[0]?.message?.content ?? "";
+    if (res.ok) {
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const content = data.choices?.[0]?.message?.content ?? "";
+      if (content.trim()) return content;
+      lastError = "OpenRouter returned an empty response";
+    } else {
+      const text = await res.text().catch(() => "");
+      lastError = `OpenRouter ${res.status} ${res.statusText}: ${text.slice(0, 300)}`;
+      // Only rate-limits (429) and transient upstream/server errors are worth retrying.
+      if (res.status !== 429 && res.status < 500) break;
+    }
+    if (attempt < 3) await sleep(1500 * (attempt + 1));
+  }
+  throw new Error(lastError);
 }

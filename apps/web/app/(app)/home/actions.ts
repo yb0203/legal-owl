@@ -7,6 +7,8 @@ import { getCase, getEnums } from "@/lib/ecourts/client";
 import { normalizeCase } from "@/lib/ecourts/normalize";
 import { syncMatter } from "@/lib/ecourts/sync";
 import { ask, emitProposal } from "@/lib/agents/orchestrator";
+import { createProposal } from "@/lib/agents/proposal";
+import { resolveSpan } from "@/lib/facts/resolve-span";
 
 const DEMO_CLIENT_TAG = "Sample data — added by “See it in action”.";
 // Demo labels are shared with the real `labels` table, so they're cleared by
@@ -456,19 +458,55 @@ export async function runDemoIntake() {
   }
   if (!doc) return;
 
-  const result = await ask(
-    "intake-registrar",
-    {
-      matter_id: matter.id,
-      document_id: doc.id,
-      document_name: DOC_NAME,
-      document_text: SHARMA_ORDER,
-    },
-    { supabase, user },
-  );
+  let emitted = 0;
+  try {
+    const result = await ask(
+      "intake-registrar",
+      {
+        matter_id: matter.id,
+        document_id: doc.id,
+        document_name: DOC_NAME,
+        document_text: SHARMA_ORDER,
+      },
+      { supabase, user },
+    );
+    for (const proposal of result.proposals) {
+      if (await emitProposal(supabase, lawyer_id, proposal)) emitted++;
+    }
+  } catch (err) {
+    // A free-model rate-limit shouldn't crash the page.
+    console.error("[runDemoIntake] intake failed:", err);
+  }
 
-  for (const proposal of result.proposals) {
+  // Demo reliability: free models frequently rate-limit. If the live agent
+  // produced nothing, fall back to a deterministic, span-accurate proposal so the
+  // approve → fact loop is always demonstrable. Approving it runs the SAME
+  // fact.create action and creates a real, verified, span-cited fact.
+  if (emitted === 0) {
+    const quote = "List the matter on 09.09.2025";
+    const span = resolveSpan(SHARMA_ORDER, quote);
+    const proposal = createProposal({
+      agent: "intake-registrar",
+      action: "fact.create",
+      args: {
+        matter_id: matter.id,
+        document_id: doc.id,
+        fact_type: "next_hearing_date",
+        value_text: "09.09.2025",
+        value: { kind: "date", date: "2025-09-09" },
+        confidence: 0.95,
+        quote,
+        start_offset: span?.start ?? 0,
+        end_offset: span?.end ?? 1,
+      },
+      citations: span
+        ? [{ kind: "span" as const, document_id: doc.id, start_offset: span.start, end_offset: span.end }]
+        : [],
+      confidence: 0.95,
+      trace: "Next hearing date extracted from the order: “List the matter on 09.09.2025”.",
+    });
     await emitProposal(supabase, lawyer_id, proposal);
   }
+
   revalidatePath("/", "layout");
 }

@@ -4,6 +4,7 @@ import { getWaitlistAccess } from "@/lib/auth";
 import { getSystemStateId } from "@/lib/db";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
+import { AssistantRail } from "@/components/assistant/assistant-rail";
 import { SampleDataBanner } from "@/components/sample-data-banner";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
@@ -66,10 +67,13 @@ export default async function AppLayout({
         tasksDueToday={tasksDueToday ?? 0}
         hearingsToday={hearingsToday ?? 0}
       />
-      <SidebarInset>
+      <SidebarInset className="h-svh overflow-hidden">
         {(sampleCount ?? 0) > 0 && <SampleDataBanner />}
         <AppHeader matters={matters ?? []} />
-        {children}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+          <AssistantRail />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

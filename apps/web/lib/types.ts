@@ -103,7 +103,7 @@ export type HearingStateType = "scheduled" | "held" | "adjourned";
 // `type` selects the flavour; type-specific legal fields live in `attributes`.
 export const TASK_TYPES = ["task", "hearing", "deadline"] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
-export type TaskSource = "manual" | "triage" | "template" | "sync";
+export type TaskSource = "manual" | "triage" | "template" | "sync" | "agent";
 
 /** type='hearing' attributes. */
 export interface HearingAttributes {
