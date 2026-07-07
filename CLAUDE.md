@@ -24,7 +24,7 @@ cp .env.example .env.local  # fill with your Supabase + Resend keys
 **Database schema** lives in `supabase/migrations/`. Apply pending migrations:
 ```bash
 cd apps/web
-supabase db push --db-url "postgresql://postgres:PASSWORD@db.PROJECTREF.supabase.co:6543/postgres?sslmode=require"
+supabase db push --db-url "postgresql://postgres:MQjq%2FLn2jz58%2BNL@db.xdejlfhmoinljppivchw.supabase.co:6543/postgres?sslmode=require"
 ```
 (Use the session pooler at port 6543, not 5432. URL-encode the password with `?sslmode=require` if it contains special characters.)
 
@@ -237,7 +237,7 @@ supabase db reset  # plays all migrations
 supabase db pull
 
 # When ready to deploy
-supabase db push --db-url "postgresql://postgres:PASSWORD@db.PROJECTREF.supabase.co:6543/postgres?sslmode=require"
+supabase db push --db-url "postgresql://postgres:MQjq%2FLn2jz58%2BNL@db.xdejlfhmoinljppivchw.supabase.co:6543/postgres?sslmode=require"
 ```
 
 **RLS policy checklist when adding tables:**

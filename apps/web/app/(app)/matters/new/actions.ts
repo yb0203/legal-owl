@@ -42,10 +42,10 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
   // Fetch from eCourts.
   const res = await getCase(cnrClean);
   if (!res.ok) {
-    if (res.reason === "not_found") return { ok: false, error: "CNR not found on eCourts. Check the number and try again." };
-    if (res.reason === "rate_limited") return { ok: false, error: "eCourts is rate-limited — wait a moment and retry." };
-    if (res.reason === "unauthorized") return { ok: false, error: "eCourts API key not configured." };
-    return { ok: false, error: "eCourts lookup failed — check your connection and retry." };
+    if (res.reason === "not_found") return { ok: false, error: `CNR "${cnrClean}" was not found on eCourts. Double-check the number and try again.` };
+    if (res.reason === "rate_limited") return { ok: false, error: "eCourts is rate-limited right now — wait a few seconds and retry." };
+    if (res.reason === "unauthorized") return { ok: false, error: "eCourts API key (ECOURTS_API_KEY) is not configured in your environment. Add it to apps/web/.env.local." };
+    return { ok: false, error: "eCourts lookup failed — check server logs for details (npm run dev terminal)." };
   }
 
   const enums = await getEnums();

@@ -12,8 +12,12 @@ const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/126.0 Safari/537.36 LegalOwl/1.0";
 
+function getApiKey(): string | null {
+  return process.env.ECOURTS_API_KEY || null;
+}
+
 function authHeaders(): HeadersInit {
-  const key = process.env.ECOURTS_API_KEY;
+  const key = getApiKey();
   if (!key) throw new Error("ECOURTS_API_KEY is not set");
   return { Authorization: `Bearer ${key}`, "User-Agent": UA, Accept: "application/json" };
 }
@@ -53,6 +57,7 @@ async function getJson(
 
 /** Look up a single case by CNR. */
 export async function getCase(cnr: Cnr): Promise<CaseResult> {
+  if (!getApiKey()) return { ok: false, reason: "unauthorized" };
   try {
     const { status, body } = await getJson(`/case/${encodeURIComponent(cnr)}`);
     if (status === 401 || status === 403) return { ok: false, reason: "unauthorized", status };
@@ -61,7 +66,8 @@ export async function getCase(cnr: Cnr): Promise<CaseResult> {
     const data = (body as { data?: { courtCaseData?: RawCaseData } })?.data?.courtCaseData;
     if (status >= 200 && status < 300 && data) return { ok: true, data };
     return { ok: false, reason: status >= 200 && status < 300 ? "not_found" : "error", status };
-  } catch {
+  } catch (err) {
+    console.error("[ecourts] getCase error:", err);
     return { ok: false, reason: "error" };
   }
 }

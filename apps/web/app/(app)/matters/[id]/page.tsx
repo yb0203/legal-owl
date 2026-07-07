@@ -38,6 +38,7 @@ import type { Label, ActivityRow, EventSource, TaskAttributes } from "@/lib/type
 interface HearingTaskRow {
   id: string;
   due_date: string | null;
+  business_on_date: string | null;
   attributes: TaskAttributes;
 }
 interface DeadlineTaskRow {
@@ -83,13 +84,25 @@ interface MatterDetail {
   cnr: string | null;
   forum_type: ForumType;
   title: string;
-  parties: Parties;
+  parties: Parties & {
+    petitioner_advocates?: string[];
+    respondent_advocates?: string[];
+  };
   case_type: string | null;
   court_status: string | null;
+  court_name: string | null;
   matter_status: MatterStatus;
   lifecycle_state: LifecycleState;
   last_successful_sync_at: string | null;
   next_hearing_date: string | null;
+  filing_date: string | null;
+  registration_number: string | null;
+  disposal_type: string | null;
+  judges: string[] | null;
+  petitioner_advocates: string[] | null;
+  respondent_advocates: string[] | null;
+  connected_cnrs: string[] | null;
+  state: string | null;
   archived_at: string | null;
   client: { id: string; display_name: string } | null;
 }
@@ -101,7 +114,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const { data: matterRow } = await supabase
     .from("matters")
     .select(
-      "id, key, cnr, forum_type, title, parties, case_type, court_status, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, archived_at, client:clients(id, display_name)",
+      "id, key, cnr, forum_type, title, parties, case_type, court_status, court_name, matter_status, lifecycle_state, last_successful_sync_at, next_hearing_date, filing_date, registration_number, disposal_type, judges, petitioner_advocates, respondent_advocates, connected_cnrs, state, archived_at, client:clients(id, display_name)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -120,9 +133,9 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   ] = await Promise.all([
     supabase.from("activity").select("id, kind, event_type, body, new_value, source, occurred_at, created_at").eq("matter_id", id).order("occurred_at", { ascending: false }).returns<ActivityRow[]>(),
     supabase.from("tasks").select("id, title, priority, due_date, completed_at, state_id, state:workflow_states(name, type)").eq("matter_id", id).eq("type", "task").order("created_at", { ascending: true }).returns<TaskRow[]>(),
-    supabase.from("tasks").select("id, due_date, attributes").eq("matter_id", id).eq("type", "hearing").order("due_date", { ascending: false }).returns<HearingTaskRow[]>(),
+    supabase.from("tasks").select("id, due_date, business_on_date, attributes").eq("matter_id", id).eq("type", "hearing").order("due_date", { ascending: false }).returns<HearingTaskRow[]>(),
     supabase.from("tasks").select("id, due_date, attributes").eq("matter_id", id).eq("type", "deadline").order("due_date", { ascending: true }).returns<DeadlineTaskRow[]>(),
-    supabase.from("documents").select("id, name, source, uploaded_at, storage_path").eq("matter_id", id).order("uploaded_at", { ascending: false }),
+    supabase.from("documents").select("id, name, source, uploaded_at, storage_path, ecourts_order_date, ecourts_order_type, ocr_status").eq("matter_id", id).order("uploaded_at", { ascending: false }),
     supabase.from("workflow_states").select("id, name, type, position").is("lawyer_id", null).order("position").returns<WorkflowState[]>(),
     supabase.from("taggings").select("label:labels(id, name, color)").eq("target_type", "matter").eq("target_id", id).returns<{ label: Label | null }[]>(),
     loadLabels(),
@@ -169,45 +182,82 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
   const parties = matter.parties ?? {};
   const petitioners = parties.petitioners ?? [];
   const respondents = parties.respondents ?? [];
+  const petitionerAdvocates = matter.petitioner_advocates ?? [];
+  const respondentAdvocates = matter.respondent_advocates ?? [];
+  const judges = matter.judges ?? [];
+  const connectedCnrs = matter.connected_cnrs ?? [];
   const openTasks = (tasks ?? []).filter((t) => !t.completed_at).length;
 
-  const partiesValue =
-    petitioners.length || respondents.length ? (
-      <span>
-        {petitioners.join(", ") || "—"} <span className="text-muted-foreground/60">v.</span>{" "}
-        {respondents.join(", ") || "—"}
-      </span>
-    ) : null;
-
-  // Every stored matter attribute, surfaced in the facts rail (AE1).
   const factRows: PropertyRow[] = [
-    {
-      label: "Matter id",
-      value: <CopyChip value={matter.key} label="Matter id" />,
-    },
-    {
-      label: "CNR",
-      value: matter.cnr ? <CopyChip value={matter.cnr} label="CNR" /> : null,
-    },
-    {
-      label: "Forum",
-      value: <AttributeValue value={<ForumBadge forum={matter.forum_type} />} domain={FORUM_TYPES.map((f) => FORUM_LABELS[f])} />,
-    },
+    // ── Identity ───────────────────────────────────────────────────────────
+    { label: "Matter ID", value: <CopyChip value={matter.key} label="Matter ID" /> },
+    { label: "CNR", value: matter.cnr ? <CopyChip value={matter.cnr} label="CNR" /> : null },
+    { label: "Reg. number", value: matter.registration_number },
+    { label: "Filed on", value: matter.filing_date ? <span className="tnum">{fmtDate(matter.filing_date)}</span> : null },
+
+    // ── Court ──────────────────────────────────────────────────────────────
+    { label: "Forum", value: <AttributeValue value={<ForumBadge forum={matter.forum_type} />} domain={FORUM_TYPES.map((f) => FORUM_LABELS[f])} /> },
+    { label: "Court", value: matter.court_name },
+    { label: "State", value: matter.state },
     { label: "Case type", value: matter.case_type },
-    { label: "Parties", value: partiesValue },
+    {
+      label: "Court status",
+      value: matter.court_status,
+      hint: <RuleHint>From eCourts (read-only)</RuleHint>,
+    },
+    {
+      label: "Lifecycle",
+      value: <AttributeValue value={LIFECYCLE_LABELS[matter.lifecycle_state]} domain={LIFECYCLE_STATES.map((s) => LIFECYCLE_LABELS[s])} />,
+      hint: <RuleHint>Sync state</RuleHint>,
+    },
+    ...(matter.disposal_type ? [{ label: "Disposal", value: matter.disposal_type }] : []),
+
+    // ── Parties ────────────────────────────────────────────────────────────
+    ...(petitioners.length > 0 ? [{
+      label: "Petitioners",
+      value: (
+        <span className="flex flex-col gap-0.5">
+          {petitioners.map((p, i) => <span key={i}>{p}</span>)}
+        </span>
+      ),
+    }] : []),
+    ...(respondents.length > 0 ? [{
+      label: "Respondents",
+      value: (
+        <span className="flex flex-col gap-0.5">
+          {respondents.map((r, i) => <span key={i}>{r}</span>)}
+        </span>
+      ),
+    }] : []),
+    ...(petitionerAdvocates.length > 0 ? [{
+      label: "Pet. advocates",
+      value: <span className="flex flex-col gap-0.5">{petitionerAdvocates.map((a, i) => <span key={i}>{a}</span>)}</span>,
+    }] : []),
+    ...(respondentAdvocates.length > 0 ? [{
+      label: "Res. advocates",
+      value: <span className="flex flex-col gap-0.5">{respondentAdvocates.map((a, i) => <span key={i}>{a}</span>)}</span>,
+    }] : []),
+    ...(judges.length > 0 ? [{
+      label: "Bench",
+      value: <span className="flex flex-col gap-0.5">{judges.map((j, i) => <span key={i}>{j}</span>)}</span>,
+    }] : []),
+
+    // ── Workflow ───────────────────────────────────────────────────────────
     {
       label: "Status",
       value: <AttributeValue value={<MatterStatusBadge status={matter.matter_status} />} domain={MATTER_STATUSES.map((s) => MATTER_STATUS_LABELS[s])} />,
     },
     {
-      label: "Lifecycle",
-      value: <AttributeValue value={LIFECYCLE_LABELS[matter.lifecycle_state]} domain={LIFECYCLE_STATES.map((s) => LIFECYCLE_LABELS[s])} />,
-      hint: <RuleHint>Court-sync state (read-only)</RuleHint>,
+      label: "Next hearing",
+      value: matter.next_hearing_date ? <HearingPill date={matter.next_hearing_date} /> : null,
+      hint: <RuleHint>Earliest scheduled hearing</RuleHint>,
     },
     {
       label: "Last synced",
       value: matter.last_successful_sync_at ? <span className="tnum">{fmtDateYear(matter.last_successful_sync_at)}</span> : null,
     },
+
+    // ── Relations ──────────────────────────────────────────────────────────
     {
       label: "Client",
       value: matter.client ? (
@@ -216,13 +266,16 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
         </Link>
       ) : null,
     },
-    {
-      label: "Next hearing",
-      // Pass null when there's no hearing so the rail's own em-dash renders,
-      // matching every other attribute's empty state.
-      value: matter.next_hearing_date ? <HearingPill date={matter.next_hearing_date} /> : null,
-      hint: <RuleHint>Computed from the earliest scheduled hearing</RuleHint>,
-    },
+    ...(connectedCnrs.length > 0 ? [{
+      label: "Tagged cases",
+      value: (
+        <span className="flex flex-col gap-0.5">
+          {connectedCnrs.map((cnr, i) => <span key={i} className="font-mono text-xs">{cnr}</span>)}
+        </span>
+      ),
+    }] : []),
+
+    // ── Activity summary + labels ──────────────────────────────────────────
     {
       label: "Activity",
       value: (
@@ -335,6 +388,7 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
                     <div className="min-w-0">
                       <div className="truncate font-medium">{h.attributes?.purpose ?? "Hearing"}</div>
                       {h.attributes?.outcome && <div className="text-xs text-muted-foreground">{h.attributes.outcome}</div>}
+                      {h.business_on_date && <div className="text-xs text-muted-foreground">Business on: {fmtDate(h.business_on_date)}</div>}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="tnum text-sm font-semibold">{h.due_date ? fmtDate(h.due_date) : "—"}</span>
@@ -413,17 +467,28 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
             <EmptyState title="No documents yet" hint="Upload orders, judgements and filings to keep the file together." />
           ) : (
             <List>
-              {documents!.map((d) => (
-                <ListRow key={d.id} className="text-sm">
-                  <FileText className="size-4 shrink-0 text-muted-foreground" />
-                  <form action={downloadDocument} className="min-w-0 flex-1">
-                    <input type="hidden" name="storage_path" value={d.storage_path} />
-                    <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
-                  </form>
-                  <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
-                  <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path} name={d.name} />
-                </ListRow>
-              ))}
+              {documents!.map((d) => {
+                const doc = d as typeof d & { ecourts_order_date?: string | null; ecourts_order_type?: string | null; ocr_status?: string | null };
+                return (
+                  <ListRow key={d.id} className="text-sm">
+                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <form action={downloadDocument}>
+                        <input type="hidden" name="storage_path" value={d.storage_path} />
+                        <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
+                      </form>
+                      {doc.ecourts_order_date && (
+                        <div className="text-xs text-muted-foreground capitalize">
+                          {doc.ecourts_order_type ?? "order"} · {fmtDate(doc.ecourts_order_date)}
+                          {doc.ocr_status === "done" && <span className="ml-2 text-primary">· OCR ready</span>}
+                        </div>
+                      )}
+                    </div>
+                    <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
+                    <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path} name={d.name} />
+                  </ListRow>
+                );
+              })}
             </List>
           )}
         </TabsContent>
