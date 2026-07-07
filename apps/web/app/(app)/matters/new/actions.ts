@@ -1,95 +1,110 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { redirectWithError } from "@/lib/redirect";
 import { nextKey } from "@/lib/db";
-import { syncOneMatter } from "@/lib/ecourts/run";
-import { searchCases } from "@/lib/ecourts/client";
-import type { SearchType, SearchCasesResult } from "@/lib/ecourts/types";
+import { getCase, getEnums } from "@/lib/ecourts/client";
+import { normalizeCase } from "@/lib/ecourts/normalize";
+import { syncMatter } from "@/lib/ecourts/sync";
+import { reactToSync } from "@/lib/agents/react";
 
-/** Search eCourts for cases matching a query — exposed as a server action for the matter creation form. */
-export async function searchEcourts(
-  query: string,
-  searchType: SearchType,
-  stateCode?: string,
-): Promise<SearchCasesResult> {
-  if (!query.trim()) return { ok: true, results: [] };
-  return searchCases({ query: query.trim(), searchType, stateCode });
-}
+export type AddMatterResult =
+  | { ok: true; matterId: string }
+  | { ok: false; error: string };
 
-export async function createMatter(formData: FormData) {
+/**
+ * Add a matter by CNR — the only required input.
+ * Fetches all case details from eCourts, creates the matter with auto-populated
+ * fields (parties, forum, status, next hearing, acts/sections, etc.),
+ * backfills hearing history, and fires Court Scout for any agent proposals.
+ */
+export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
+  const cnrClean = cnr.trim().toUpperCase();
+  if (!cnrClean) return { ok: false, error: "Please enter a CNR." };
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const lawyer_id = user.id;
 
-  const split = (v: FormDataEntryValue | null) =>
-    String(v || "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+  // Prevent duplicates.
+  const { data: existing } = await supabase
+    .from("matters")
+    .select("id")
+    .eq("cnr", cnrClean)
+    .eq("lawyer_id", user.id)
+    .maybeSingle();
+  if (existing?.id) return { ok: false, error: "You already have a matter with this CNR." };
 
-  const clientId = String(formData.get("client_id") || "") || null;
+  // Fetch from eCourts.
+  const res = await getCase(cnrClean);
+  if (!res.ok) {
+    if (res.reason === "not_found") return { ok: false, error: "CNR not found on eCourts. Check the number and try again." };
+    if (res.reason === "rate_limited") return { ok: false, error: "eCourts is rate-limited — wait a moment and retry." };
+    if (res.reason === "unauthorized") return { ok: false, error: "eCourts API key not configured." };
+    return { ok: false, error: "eCourts lookup failed — check your connection and retry." };
+  }
 
-  const firstHearing = String(formData.get("first_hearing_date") || "") || null;
+  const enums = await getEnums();
+  const c = normalizeCase(res.data, enums);
 
-  const { data: inserted, error } = await supabase
+  // Build a title from parties. e.g. "Sharma vs State of MP"
+  const pet = c.petitioners[0] ?? "Petitioner";
+  const res_ = c.respondents[0] ?? "Respondent";
+  const title = `${pet} vs ${res_}`;
+
+  // Create the matter with all eCourts-sourced fields.
+  const { data: matter, error: insertError } = await supabase
     .from("matters")
     .insert({
-      lawyer_id,
+      lawyer_id: user.id,
       key: await nextKey(supabase, "matters", "M-"),
-      title: String(formData.get("title")),
-      forum_type: String(formData.get("forum_type") || "district"),
-      case_type: String(formData.get("case_type") || "").trim() || null,
-      cnr: String(formData.get("cnr") || "").trim() || null,
-      client_id: clientId,
-      parties: {
-        petitioners: split(formData.get("petitioners")),
-        respondents: split(formData.get("respondents")),
-      },
-      next_hearing_date: firstHearing,
+      title,
+      cnr: cnrClean,
+      forum_type: c.forum_type ?? "district",
+      case_type: c.case_type ?? null,
+      court_status: c.court_status ?? null,
+      next_hearing_date: c.next_hearing_date ?? null,
+      lifecycle_state: c.lifecycle_hint,
+      last_successful_sync_at: new Date().toISOString(),
+      parties: { petitioners: c.petitioners, respondents: c.respondents },
+      // Newly captured fields.
+      filing_date: c.filing_date ?? null,
+      registration_number: c.registration_number ?? null,
+      judges: c.judges.length > 0 ? c.judges : null,
+      advocates: c.advocates.length > 0 ? c.advocates : null,
+      acts_sections: c.acts_sections.length > 0 ? c.acts_sections : null,
+      connected_cnrs: c.connected_cnrs.length > 0 ? c.connected_cnrs : null,
+      state: c.state ?? null,
+      state_code: c.state_code ?? null,
     })
-    .select("id")
+    .select("id, lawyer_id, cnr, court_status, next_hearing_date")
     .single();
 
-  if (error) redirectWithError("/matters/new", error.message);
-
-  if (firstHearing && inserted) {
-    await supabase.from("tasks").insert({
-      lawyer_id,
-      matter_id: inserted.id,
-      type: "hearing",
-      title: "First hearing",
-      due_date: firstHearing,
-      source: "manual",
-      attributes: { purpose: "First hearing", court_state: "scheduled" },
-    });
+  if (insertError || !matter) {
+    return { ok: false, error: insertError?.message ?? "Failed to create matter." };
   }
 
-  // Connect-by-CNR (U5): if a CNR was given, do a first sync to backfill the
-  // timeline + projections (best-effort — never block matter creation on it).
-  const cnr = String(formData.get("cnr") || "").trim() || null;
-  if (cnr && inserted) {
-    await supabase
-      .from("matters")
-      .update({ lifecycle_state: "pending_first_sync" })
-      .eq("id", inserted.id);
-    try {
-      const { data: m } = await supabase
-        .from("matters")
-        .select("id, lawyer_id, cnr, court_status, next_hearing_date")
-        .eq("id", inserted.id)
-        .single();
-      if (m) await syncOneMatter(supabase, m as Parameters<typeof syncOneMatter>[1], { react: true });
-    } catch {
-      /* sync is best-effort; the lawyer can retry via Sync now */
-    }
+  // Backfill hearing history and trigger agent reactions.
+  // syncMatter handles idempotency so this is safe to run immediately.
+  try {
+    const summary = await syncMatter(supabase, matter, c);
+    await reactToSync(supabase, user.id, matter.id, summary.events);
+  } catch {
+    // Sync failure is non-fatal — the matter was created with the base data.
   }
 
-  revalidatePath("/matters");
-  redirect(`/matters/${inserted!.id}`);
+  return { ok: true, matterId: matter.id };
+}
+
+/**
+ * Server action wrapper for the form — redirects on success.
+ * Used by the AddMatterByCnr client component.
+ */
+export async function addMatterAction(formData: FormData): Promise<{ error: string } | never> {
+  const cnr = String(formData.get("cnr") ?? "");
+  const result = await addMatterByCnr(cnr);
+  if (result.ok) redirect(`/matters/${result.matterId}`);
+  return { error: result.error };
 }
