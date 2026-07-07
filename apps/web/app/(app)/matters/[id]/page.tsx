@@ -470,24 +470,41 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
           ) : (
             <List>
               {documents!.map((d) => {
-                const doc = d as typeof d & { ecourts_order_date?: string | null; ecourts_order_type?: string | null; ocr_status?: string | null };
+                const doc = d as typeof d & {
+                  ecourts_order_date?: string | null;
+                  ecourts_order_type?: string | null;
+                  ocr_status?: string | null;
+                };
+                // storage_path is either a Supabase Storage key or an eCourts URL (fallback).
+                const isExternalUrl = d.storage_path?.startsWith("http");
+                const hasFile = !!d.storage_path;
+
                 return (
                   <ListRow key={d.id} className="text-sm">
                     <FileText className="size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
-                      <form action={downloadDocument}>
-                        <input type="hidden" name="storage_path" value={d.storage_path} />
-                        <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
-                      </form>
-                      {doc.ecourts_order_date && (
-                        <div className="text-xs text-muted-foreground capitalize">
-                          {doc.ecourts_order_type ?? "order"} · {fmtDate(doc.ecourts_order_date)}
-                          {doc.ocr_status === "done" && <span className="ml-2 text-primary">· OCR ready</span>}
-                        </div>
+                      {isExternalUrl ? (
+                        <a href={d.storage_path} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">
+                          {d.name}
+                        </a>
+                      ) : hasFile ? (
+                        <form action={downloadDocument}>
+                          <input type="hidden" name="storage_path" value={d.storage_path} />
+                          <button type="submit" className="truncate text-left hover:underline">{d.name}</button>
+                        </form>
+                      ) : (
+                        <span className="truncate text-muted-foreground">{d.name}</span>
                       )}
+                      <div className="text-xs text-muted-foreground capitalize">
+                        {doc.ecourts_order_date
+                          ? `${doc.ecourts_order_type ?? "order"} · ${fmtDate(doc.ecourts_order_date)}`
+                          : d.source.replace("_", " ")}
+                        {doc.ocr_status === "done" && <span className="ml-2 text-primary">· OCR ready</span>}
+                        {!hasFile && <span className="ml-2 italic">· No PDF from eCourts</span>}
+                      </div>
                     </div>
                     <span className="tnum shrink-0 text-xs text-muted-foreground">{fmtDate(d.uploaded_at)}</span>
-                    <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path} name={d.name} />
+                    <ConfirmDeleteDocument docId={d.id} matterId={id} storagePath={d.storage_path ?? ""} name={d.name} />
                   </ListRow>
                 );
               })}

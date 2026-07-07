@@ -1,7 +1,6 @@
-// Order PDF ingestion — download, store, OCR, and fire document.uploaded.
-// Server-only. Called from sync.ts on each genuinely-new order_uploaded event.
-// Best-effort: failures are logged and set ocr_status='failed' without throwing
-// so a broken PDF download never aborts the sync.
+// Order ingestion — create a document record for every court order, download
+// the PDF when available, OCR via eCourts, and fire document.uploaded.
+// Server-only.
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { runAmbient } from "@/lib/agents/orchestrator";
@@ -14,11 +13,10 @@ interface IngestContext {
 }
 
 /**
- * Download an order PDF, store it in case-documents, populate OCR text from
- * the eCourts OCR markdown, and fire the document.uploaded ambient event so
- * Intake Registrar and Limitation Clerk can extract facts.
- *
- * Returns the inserted document id, or null on failure.
+ * Create a document record for a court order from eCourts.
+ * When a PDF URL is available, downloads and stores it.
+ * Always creates a document entry — even orders without downloadable PDFs
+ * appear in the Documents tab so the lawyer knows they exist.
  */
 export async function ingestOrder(
   ctx: IngestContext,
@@ -26,9 +24,7 @@ export async function ingestOrder(
 ): Promise<string | null> {
   const { supabase, lawyerId, matterId } = ctx;
 
-  if (!order.url) return null;
-
-  // Idempotency: skip if a document for this order date + matter already exists.
+  // Idempotency: skip if this order date is already recorded for this matter.
   const { data: existing } = await supabase
     .from("documents")
     .select("id")
@@ -38,58 +34,92 @@ export async function ingestOrder(
     .maybeSingle();
   if (existing?.id) return existing.id as string;
 
-  // 1. Download the PDF.
-  let pdfBuffer: ArrayBuffer | null = null;
-  try {
-    const res = await fetch(order.url, { signal: AbortSignal.timeout(30_000) });
-    if (res.ok) pdfBuffer = await res.arrayBuffer();
-  } catch (err) {
-    console.error("[ingestOrder] PDF download failed:", err);
-  }
+  const orderName = `${order.order_type === "judgment" ? "Judgment" : "Order"} — ${order.order_date}`;
 
-  if (!pdfBuffer) {
-    // Can't download — insert a stub row with ocr_status='failed' so we know
-    // the order exists even without the PDF.
+  // No URL: create a stub so the order is visible in the Documents tab.
+  if (!order.url) {
     const { data: stub } = await supabase
       .from("documents")
       .insert({
         lawyer_id: lawyerId,
         matter_id: matterId,
-        name: `Order ${order.order_date}`,
+        name: orderName,
         storage_path: "",
         source: "court_order",
         ecourts_order_date: order.order_date,
         ecourts_order_type: order.order_type ?? "order",
-        ocr_status: "failed",
         ocr_text: order.ocr_markdown ?? null,
+        ocr_status: order.ocr_markdown ? "done" : "na",
       })
       .select("id")
       .single();
     return (stub?.id as string) ?? null;
   }
 
-  // 2. Upload to Storage: ${lawyerId}/${matterId}/orders/${order_date}.pdf
+  // Try to download the PDF.
+  let pdfBuffer: ArrayBuffer | null = null;
+  try {
+    const res = await fetch(order.url, { signal: AbortSignal.timeout(20_000) });
+    if (res.ok) pdfBuffer = await res.arrayBuffer();
+  } catch (err) {
+    console.error("[ingestOrder] PDF download failed:", err);
+  }
+
+  if (!pdfBuffer) {
+    // URL present but download failed — record the order with the URL as
+    // storage_path so the lawyer can still open it from the eCourts portal.
+    const { data: stub } = await supabase
+      .from("documents")
+      .insert({
+        lawyer_id: lawyerId,
+        matter_id: matterId,
+        name: orderName,
+        storage_path: order.url,      // store the eCourts URL directly
+        source: "court_order",
+        ecourts_order_date: order.order_date,
+        ecourts_order_type: order.order_type ?? "order",
+        ocr_text: order.ocr_markdown ?? null,
+        ocr_status: "failed",
+      })
+      .select("id")
+      .single();
+    return (stub?.id as string) ?? null;
+  }
+
+  // Upload PDF to Storage.
   const storagePath = `${lawyerId}/${matterId}/orders/${order.order_date}.pdf`;
   const { error: uploadError } = await supabase.storage
     .from("case-documents")
-    .upload(storagePath, pdfBuffer, {
-      contentType: "application/pdf",
-      upsert: true, // safe re-upload for retries
-    });
+    .upload(storagePath, pdfBuffer, { contentType: "application/pdf", upsert: true });
 
   if (uploadError) {
     console.error("[ingestOrder] Storage upload failed:", uploadError.message);
-    return null;
+    // Fall back to storing the eCourts URL.
+    const { data: stub } = await supabase
+      .from("documents")
+      .insert({
+        lawyer_id: lawyerId,
+        matter_id: matterId,
+        name: orderName,
+        storage_path: order.url,
+        source: "court_order",
+        ecourts_order_date: order.order_date,
+        ecourts_order_type: order.order_type ?? "order",
+        ocr_text: order.ocr_markdown ?? null,
+        ocr_status: "failed",
+      })
+      .select("id")
+      .single();
+    return (stub?.id as string) ?? null;
   }
 
-  // 3. Insert the documents row.
   const ocrStatus = order.ocr_markdown ? "done" : "pending";
   const { data: doc, error: insertError } = await supabase
     .from("documents")
     .insert({
       lawyer_id: lawyerId,
       matter_id: matterId,
-      name: `Order ${order.order_date}`,
+      name: orderName,
       storage_path: storagePath,
       mime_type: "application/pdf",
       source: "court_order",
@@ -108,8 +138,7 @@ export async function ingestOrder(
 
   const documentId = doc.id as string;
 
-  // 4. Fire document.uploaded so Intake Registrar and Limitation Clerk can act.
-  //    Only fires when OCR text is available (otherwise agents have nothing to cite).
+  // Fire document.uploaded so agents can extract facts.
   if (order.ocr_markdown) {
     try {
       await runAmbient(
@@ -117,7 +146,6 @@ export async function ingestOrder(
         { supabase, user: { id: lawyerId } as unknown as User },
       );
     } catch (err) {
-      // Agent failures never abort the ingestion.
       console.error("[ingestOrder] runAmbient failed:", err);
     }
   }

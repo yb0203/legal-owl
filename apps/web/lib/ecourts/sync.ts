@@ -158,13 +158,13 @@ export async function syncMatter(
       triaged = triage.length;
     }
 
-    // Ingest order PDFs for genuinely-new order_uploaded events.
-    // Best-effort — failures are logged in ingestOrder, never thrown here.
+    // Ingest orders for genuinely-new order_uploaded events.
+    // Awaited so documents exist by the time the user lands on the case file.
     const newOrders = c.orders.filter((o) =>
       freshHashes.has(`sync:order:${o.order_date}:${o.url ?? ""}`),
     );
     for (const order of newOrders) {
-      void ingestOrder({ supabase, lawyerId: lawyer_id, matterId: matter_id }, order);
+      await ingestOrder({ supabase, lawyerId: lawyer_id, matterId: matter_id }, order);
     }
   }
 
