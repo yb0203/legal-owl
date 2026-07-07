@@ -12,17 +12,14 @@ export type AddMatterResult =
   | { ok: true; matterId: string }
   | { ok: false; error: string };
 
-/**
- * Add a matter by CNR — the only required input.
- * Fetches all case details from eCourts, creates the matter with auto-populated
- * fields (parties, forum, status, next hearing, acts/sections, etc.),
- * backfills hearing history, and fires Court Scout for any agent proposals.
- */
 export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
-  // Strip dashes/spaces — eCourts accepts "UPHC02023139202025" not "UPHC02-023139-2025"
   const cnrClean = cnr.trim().toUpperCase().replace(/[-\s]/g, "");
   if (!cnrClean) return { ok: false, error: "Please enter a CNR." };
-  if (cnrClean.length < 10) return { ok: false, error: `"${cnr}" doesn't look like a valid CNR. It should be 16 characters, e.g. UPHC020231392025.` };
+  if (cnrClean.length < 10)
+    return {
+      ok: false,
+      error: `"${cnr}" doesn't look like a valid CNR. It should be 16 characters, e.g. UPHC020231392025.`,
+    };
 
   const supabase = await createClient();
   const {
@@ -30,7 +27,7 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // If the matter already exists, just return it — no error.
+  // If the matter already exists, go straight to it.
   const { data: existing } = await supabase
     .from("matters")
     .select("id")
@@ -42,21 +39,26 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
   // Fetch from eCourts.
   const res = await getCase(cnrClean);
   if (!res.ok) {
-    if (res.reason === "not_found") return { ok: false, error: `CNR "${cnrClean}" was not found on eCourts. Double-check the number and try again.` };
-    if (res.reason === "rate_limited") return { ok: false, error: "eCourts is rate-limited right now — wait a few seconds and retry." };
-    if (res.reason === "unauthorized") return { ok: false, error: "eCourts API key (ECOURTS_API_KEY) is not configured in your environment. Add it to apps/web/.env.local." };
-    return { ok: false, error: "eCourts lookup failed — check server logs for details (npm run dev terminal)." };
+    if (res.reason === "not_found")
+      return { ok: false, error: `CNR "${cnrClean}" was not found on eCourts. Double-check the number and try again.` };
+    if (res.reason === "rate_limited")
+      return { ok: false, error: "eCourts is rate-limited right now — wait a few seconds and retry." };
+    if (res.reason === "unauthorized")
+      return { ok: false, error: "eCourts API key (ECOURTS_API_KEY) is not configured. Add it to apps/web/.env.local." };
+    return { ok: false, error: "eCourts lookup failed — check the server terminal for details." };
   }
 
   const enums = await getEnums();
   const c = normalizeCase(res.data, enums);
 
-  // Build a title from parties. e.g. "Ishwarlal vs State of Madhya Pradesh"
   const pet = c.petitioners[0] ?? "Petitioner";
   const resp = c.respondents[0] ?? "Respondent";
   const title = `${pet} vs ${resp}`;
 
-  // Create the matter with all eCourts-sourced fields.
+  // Insert the matter WITHOUT court_status / next_hearing_date so that
+  // syncMatter below sees a full diff and generates the complete activity
+  // timeline (status_changed, hearing_date_changed, order_uploaded events)
+  // and inserts every hearing from the API history as a task.
   const { data: matter, error: insertError } = await supabase
     .from("matters")
     .insert({
@@ -66,17 +68,14 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
       cnr: cnrClean,
       forum_type: c.forum_type ?? "district",
       case_type: c.case_type ?? null,
-      court_status: c.court_status ?? null,
-      next_hearing_date: c.next_hearing_date ?? null,
-      lifecycle_state: c.lifecycle_hint,
-      last_successful_sync_at: new Date().toISOString(),
+      // court_status and next_hearing_date intentionally omitted —
+      // syncMatter will diff from null and write them with proper activity rows.
+      lifecycle_state: "pending_first_sync",
       parties: {
         petitioners: c.petitioners,
         respondents: c.respondents,
-        petitioner_advocates: c.petitioner_advocates,
-        respondent_advocates: c.respondent_advocates,
       },
-      // eCourts-sourced fields.
+      // Static eCourts identity fields (not sync projections).
       filing_date: c.filing_date ?? null,
       registration_number: c.registration_number ?? null,
       court_code: c.court_code ?? null,
@@ -96,22 +95,20 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
     return { ok: false, error: insertError?.message ?? "Failed to create matter." };
   }
 
-  // Backfill hearing history and trigger agent reactions.
-  // syncMatter handles idempotency so this is safe to run immediately.
+  // syncMatter: diff from (null, null) → generates full activity timeline
+  // and inserts all hearings from the API history as tasks.
+  // Errors are logged but non-fatal — the matter exists and the lawyer
+  // can press Sync now to retry.
   try {
     const summary = await syncMatter(supabase, matter, c);
     await reactToSync(supabase, user.id, matter.id, summary.events);
-  } catch {
-    // Sync failure is non-fatal — the matter was created with the base data.
+  } catch (err) {
+    console.error("[addMatterByCnr] syncMatter failed:", err);
   }
 
   return { ok: true, matterId: matter.id };
 }
 
-/**
- * Server action wrapper for the form — redirects on success.
- * Used by the AddMatterByCnr client component.
- */
 export async function addMatterAction(formData: FormData): Promise<{ error: string } | never> {
   const cnr = String(formData.get("cnr") ?? "");
   const result = await addMatterByCnr(cnr);

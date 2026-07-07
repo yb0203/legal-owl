@@ -87,6 +87,24 @@ export async function syncMatter(
     });
   }
 
+  // Hearing history: write each past hearing as an activity event so the
+  // timeline shows the full case history, not just future diffs.
+  // Only fires when matter.court_status is null (first sync) — idempotent
+  // via content_hash so re-syncing never duplicates.
+  if (!matter.court_status) {
+    for (const h of c.hearings) {
+      derived.push({
+        event_type: "hearing_held",
+        previous_value: null,
+        new_value: h.purpose ?? "Hearing",
+        occurred_at: h.hearing_date,
+        content_hash: `sync:hearing:${h.hearing_date}`,
+        kind: "hearing_held",
+        summary: h.purpose ? `Hearing: ${h.purpose}` : `Hearing on ${h.hearing_date}`,
+      });
+    }
+  }
+
   // Append activity rows idempotently; `.select()` returns ONLY newly-inserted
   // rows (ON CONFLICT DO NOTHING), so triage fires once per genuinely-new change.
   let triaged = 0;

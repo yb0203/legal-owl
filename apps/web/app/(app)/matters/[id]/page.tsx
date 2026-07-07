@@ -57,9 +57,11 @@ import {
 
 const EVENT_LABELS: Record<string, string> = {
   order_uploaded: "Order uploaded",
-  hearing_date_changed: "Hearing date changed",
-  status_changed: "Status changed",
+  hearing_date_changed: "Next hearing",
+  status_changed: "Status",
+  hearing_held: "Hearing",
   judge_changed: "Judge changed",
+  cause_list_entry: "Listed in cause list",
   document_added: "Document added",
   document_removed: "Document removed",
 };
