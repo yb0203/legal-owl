@@ -1,6 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { NormalizedCase } from "@/lib/ecourts/types";
 import { getSystemStateId } from "@/lib/db";
+import { ingestOrder } from "@/lib/ecourts/ingest";
 
 type DB = Awaited<ReturnType<typeof createClient>>;
 
@@ -138,6 +139,15 @@ export async function syncMatter(
       );
       triaged = triage.length;
     }
+
+    // Ingest order PDFs for genuinely-new order_uploaded events.
+    // Best-effort — failures are logged in ingestOrder, never thrown here.
+    const newOrders = c.orders.filter((o) =>
+      freshHashes.has(`sync:order:${o.order_date}:${o.url ?? ""}`),
+    );
+    for (const order of newOrders) {
+      void ingestOrder({ supabase, lawyerId: lawyer_id, matterId: matter_id }, order);
+    }
   }
 
   // Hearing tasks: read-then-write dedup on due_date (no jsonb upsert). Existing
@@ -167,7 +177,9 @@ export async function syncMatter(
             outcome: h.outcome ?? null,
             court_state,
           };
-          await supabase.from("tasks").update({ attributes }).eq("id", found.id as string);
+          const update: Record<string, unknown> = { attributes };
+          if (h.business_on_date) update.business_on_date = h.business_on_date;
+          await supabase.from("tasks").update(update).eq("id", found.id as string);
         }
       } else if (!queued.has(h.hearing_date)) {
         queued.add(h.hearing_date);
@@ -178,6 +190,7 @@ export async function syncMatter(
           title: h.purpose ?? "Hearing",
           due_date: h.hearing_date,
           source: "sync",
+          business_on_date: h.business_on_date ?? null,
           attributes: { purpose: h.purpose, outcome: h.outcome, court_state },
         });
       }
@@ -185,8 +198,10 @@ export async function syncMatter(
     if (toInsert.length) await supabase.from("tasks").insert(toInsert);
   }
 
-  // Update matter projections (court_status/next-hearing are eCourts-owned; the
-  // lawyer's matter_status is left untouched). lifecycle reflects sync disposition.
+  // Update matter projections. court_status/next_hearing/lifecycle are eCourts-owned
+  // and always overwritten. The new fields (judges, advocates, etc.) are also
+  // eCourts-owned — overwrite them on every sync so they stay current.
+  // The lawyer's matter_status is never touched.
   await supabase
     .from("matters")
     .update({
@@ -194,6 +209,15 @@ export async function syncMatter(
       next_hearing_date: c.next_hearing_date ?? matter.next_hearing_date,
       lifecycle_state: c.lifecycle_hint,
       last_successful_sync_at: now,
+      // Newly captured fields — null means API didn't return them; preserve existing value.
+      ...(c.filing_date !== null && { filing_date: c.filing_date }),
+      ...(c.registration_number !== null && { registration_number: c.registration_number }),
+      ...(c.judges.length > 0 && { judges: c.judges }),
+      ...(c.advocates.length > 0 && { advocates: c.advocates }),
+      ...(c.acts_sections.length > 0 && { acts_sections: c.acts_sections }),
+      ...(c.connected_cnrs.length > 0 && { connected_cnrs: c.connected_cnrs }),
+      ...(c.state !== null && { state: c.state }),
+      ...(c.state_code !== null && { state_code: c.state_code }),
     })
     .eq("id", matter_id);
 
