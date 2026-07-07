@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Landmark, AlarmClock, CircleCheck, FilePlus2, Plus, Inbox } from "lucide-react";
+import { ChevronRight, Landmark, AlarmClock, CircleCheck, FilePlus2, Plus, Inbox, Scale } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSystemWorkflowStates, getSystemStateId } from "@/lib/db";
 import { FORUM_LABELS, type ForumType, type TaskAttributes } from "@/lib/types";
@@ -14,6 +14,7 @@ import { ModelOrientation } from "@/components/model-orientation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageShell, Panel, SectionHeading, List, ListRow, Callout } from "@/components/layout";
 import { seedSampleData } from "./actions";
+import { fetchAndStoreCauseList, type CauseListEntry } from "@/lib/ecourts/cause-list";
 
 interface HearingLite {
   id: string;
@@ -116,6 +117,14 @@ export default async function HomePage() {
 
   const work = workRows ?? [];
   const { groups } = groupByTimeHorizon(work, (t) => t.due_date);
+
+  // Cause list — best-effort, never throws.
+  let causeListEntries: CauseListEntry[] = [];
+  try {
+    causeListEntries = await fetchAndStoreCauseList(supabase, today);
+  } catch {
+    // Don't let cause list failures break the Home page.
+  }
   const overdueCount = groups.find((g) => g.bucket === "overdue")?.items.length ?? 0;
 
   return (
@@ -163,6 +172,36 @@ export default async function HomePage() {
               Open inbox <ChevronRight className="size-4" />
             </span>
           </Callout>
+        )}
+
+        {causeListEntries.length > 0 && (
+          <section>
+            <SectionHeading>Courts today</SectionHeading>
+            <List>
+              {causeListEntries.map((entry) => (
+                <ListRow
+                  key={`${entry.matter_id}-${entry.serial_no}`}
+                  href={`/matters/${entry.matter_id}`}
+                  leading={<Scale className="size-4 shrink-0 text-primary" />}
+                  title={entry.matter_title}
+                  subtitle={
+                    <>
+                      {entry.court_code}
+                      {entry.serial_no != null && ` · #${entry.serial_no}`}
+                      {entry.purpose && ` · ${entry.purpose}`}
+                    </>
+                  }
+                  trailing={
+                    entry.slot_time ? (
+                      <span className="tnum shrink-0 text-xs text-muted-foreground">
+                        {entry.slot_time}
+                      </span>
+                    ) : null
+                  }
+                />
+              ))}
+            </List>
+          </section>
         )}
 
         <section>
