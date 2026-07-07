@@ -466,7 +466,14 @@ export default async function MatterDetailPage({ params }: { params: Promise<{ i
             <Button type="submit" size="sm">Upload</Button>
           </form>
           {(documents?.length ?? 0) === 0 ? (
-            <EmptyState title="No documents yet" hint="Upload orders, judgements and filings to keep the file together." />
+            <EmptyState
+              title="No documents yet"
+              hint={
+                matter.cnr
+                  ? "Court orders and judgements will appear here automatically when eCourts makes them available. You can also upload your own filings below."
+                  : "Upload orders, judgements and filings to keep the file together."
+              }
+            />
           ) : (
             <List>
               {documents!.map((d) => {

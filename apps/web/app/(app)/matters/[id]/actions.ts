@@ -6,6 +6,47 @@ import { createClient } from "@/lib/supabase/server";
 import { nextKey } from "@/lib/db";
 import { syncOneMatter, type RunResult } from "@/lib/ecourts/run";
 
+/** Raw eCourts API response for a matter's CNR — for debugging document/order availability. */
+export async function getRawEcourtsData(matterId: string): Promise<{
+  ok: boolean;
+  cnr?: string;
+  raw?: unknown;
+  orders?: { date: string; url: string | null; type: string }[];
+  orderCount?: number;
+  judgmentCount?: number;
+  error?: string;
+}> {
+  const { supabase, user } = await authed();
+  if (!user) return { ok: false, error: "Unauthorized" };
+
+  const { data: m } = await supabase
+    .from("matters")
+    .select("id, cnr")
+    .eq("id", matterId)
+    .maybeSingle();
+  if (!m?.cnr) return { ok: false, error: "No CNR on this matter" };
+
+  const { getCase, getEnums } = await import("@/lib/ecourts/client");
+  const res = await getCase(m.cnr as string);
+  if (!res.ok) return { ok: false, cnr: m.cnr as string, error: res.reason };
+
+  const raw = res.data;
+  const orders = [
+    ...(raw.judgmentOrders ?? []).map((o) => ({ date: o.orderDate ?? "", url: o.orderUrl ?? null, type: "judgment" })),
+    ...(raw.interimOrders ?? []).map((o) => ({ date: o.orderDate ?? "", url: o.orderUrl ?? null, type: "interim" })),
+  ];
+
+  return {
+    ok: true,
+    cnr: m.cnr as string,
+    orderCount: raw.orderCount ?? 0,
+    judgmentCount: raw.judgmentCount ?? 0,
+    orders,
+    // Include full raw response for inspection
+    raw: process.env.NODE_ENV === "development" ? raw : undefined,
+  };
+}
+
 // "Sync now" — fetch the matter's CNR from eCourts and diff into its timeline.
 export async function syncMatterNow(matterId: string): Promise<RunResult> {
   const { supabase, user } = await authed();
