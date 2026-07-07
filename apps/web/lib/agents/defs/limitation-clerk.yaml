@@ -11,7 +11,7 @@ description: >-
 trigger: on_demand
 input: limitation-clerk
 adapter: openrouter
-model: openrouter/free  # free model for the demo (auto-routes to an available free model)
+model: google/gemini-flash-1.5
 temperature: 0
 actions:
   - task.create
