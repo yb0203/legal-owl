@@ -45,10 +45,6 @@ court events on a schedule, and maintains the unified case timeline (court event
 that everything else grounds on. This is the system of record — the foundation the other subparts
 depend on.
 
-> A Streamlit prototype of the eCourts integration + case data model lives at
-> [`prototype/ecourts-streamlit/`](./prototype/ecourts-streamlit/) (reference for the production
-> Next.js build).
-
 ### 4. Client Notifs
 A CRM-like client-success layer that turns court events into plain-language, lawyer-approved client
 updates. Built on the **Vercel Chat SDK** (multi-channel messaging) with a **Resend** email adapter
@@ -70,8 +66,6 @@ apps/
   web/                       # Next.js app (Vercel) — the product
 supabase/
   migrations/                # database schema (Supabase, Mumbai)
-prototype/
-  ecourts-streamlit/         # Streamlit prototype of the eCourts integration
 ```
 
 ## Running the web app

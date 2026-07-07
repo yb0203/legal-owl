@@ -18,3 +18,4 @@
 # Python prototype venv
 .venv/
 venv/
+.env*
