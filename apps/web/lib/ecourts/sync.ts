@@ -209,13 +209,17 @@ export async function syncMatter(
       next_hearing_date: c.next_hearing_date ?? matter.next_hearing_date,
       lifecycle_state: c.lifecycle_hint,
       last_successful_sync_at: now,
-      // Newly captured fields — null means API didn't return them; preserve existing value.
+      // eCourts-sourced fields — only overwrite when the API returned them.
       ...(c.filing_date !== null && { filing_date: c.filing_date }),
       ...(c.registration_number !== null && { registration_number: c.registration_number }),
+      ...(c.court_code !== null && { court_code: c.court_code }),
+      ...(c.court_name !== null && { court_name: c.court_name }),
+      ...(c.case_type !== null && { case_type: c.case_type }),
+      ...(c.disposal_type !== null && { disposal_type: c.disposal_type }),
       ...(c.judges.length > 0 && { judges: c.judges }),
-      ...(c.advocates.length > 0 && { advocates: c.advocates }),
-      ...(c.acts_sections.length > 0 && { acts_sections: c.acts_sections }),
-      ...(c.connected_cnrs.length > 0 && { connected_cnrs: c.connected_cnrs }),
+      ...(c.petitioner_advocates.length > 0 && { petitioner_advocates: c.petitioner_advocates }),
+      ...(c.respondent_advocates.length > 0 && { respondent_advocates: c.respondent_advocates }),
+      ...(c.tagged_matters.length > 0 && { connected_cnrs: c.tagged_matters }),
       ...(c.state !== null && { state: c.state }),
       ...(c.state_code !== null && { state_code: c.state_code }),
     })

@@ -19,8 +19,10 @@ export type AddMatterResult =
  * backfills hearing history, and fires Court Scout for any agent proposals.
  */
 export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
-  const cnrClean = cnr.trim().toUpperCase();
+  // Strip dashes/spaces — eCourts accepts "UPHC02023139202025" not "UPHC02-023139-2025"
+  const cnrClean = cnr.trim().toUpperCase().replace(/[-\s]/g, "");
   if (!cnrClean) return { ok: false, error: "Please enter a CNR." };
+  if (cnrClean.length < 10) return { ok: false, error: `"${cnr}" doesn't look like a valid CNR. It should be 16 characters, e.g. UPHC020231392025.` };
 
   const supabase = await createClient();
   const {
@@ -49,10 +51,10 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
   const enums = await getEnums();
   const c = normalizeCase(res.data, enums);
 
-  // Build a title from parties. e.g. "Sharma vs State of MP"
+  // Build a title from parties. e.g. "Ishwarlal vs State of Madhya Pradesh"
   const pet = c.petitioners[0] ?? "Petitioner";
-  const res_ = c.respondents[0] ?? "Respondent";
-  const title = `${pet} vs ${res_}`;
+  const resp = c.respondents[0] ?? "Respondent";
+  const title = `${pet} vs ${resp}`;
 
   // Create the matter with all eCourts-sourced fields.
   const { data: matter, error: insertError } = await supabase
@@ -68,14 +70,22 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
       next_hearing_date: c.next_hearing_date ?? null,
       lifecycle_state: c.lifecycle_hint,
       last_successful_sync_at: new Date().toISOString(),
-      parties: { petitioners: c.petitioners, respondents: c.respondents },
-      // Newly captured fields.
+      parties: {
+        petitioners: c.petitioners,
+        respondents: c.respondents,
+        petitioner_advocates: c.petitioner_advocates,
+        respondent_advocates: c.respondent_advocates,
+      },
+      // eCourts-sourced fields.
       filing_date: c.filing_date ?? null,
       registration_number: c.registration_number ?? null,
+      court_code: c.court_code ?? null,
+      court_name: c.court_name ?? null,
+      disposal_type: c.disposal_type ?? null,
       judges: c.judges.length > 0 ? c.judges : null,
-      advocates: c.advocates.length > 0 ? c.advocates : null,
-      acts_sections: c.acts_sections.length > 0 ? c.acts_sections : null,
-      connected_cnrs: c.connected_cnrs.length > 0 ? c.connected_cnrs : null,
+      petitioner_advocates: c.petitioner_advocates.length > 0 ? c.petitioner_advocates : null,
+      respondent_advocates: c.respondent_advocates.length > 0 ? c.respondent_advocates : null,
+      connected_cnrs: c.tagged_matters.length > 0 ? c.tagged_matters : null,
       state: c.state ?? null,
       state_code: c.state_code ?? null,
     })

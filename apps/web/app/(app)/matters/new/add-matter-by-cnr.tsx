@@ -44,8 +44,10 @@ export function AddMatterByCnr() {
           Case Number Record (CNR)
         </Label>
         <p className="text-xs text-muted-foreground">
-          The 16-character identifier printed on every eCourts case, e.g.{" "}
-          <span className="font-mono">DLHC010001232024</span>
+          The 16-character identifier printed on every eCourts case.
+          Dashes are stripped automatically, so{" "}
+          <span className="font-mono">UPHC02-023139-2025</span> and{" "}
+          <span className="font-mono">UPHC020231392025</span> both work.
         </p>
         <div className="flex gap-2">
           <Input

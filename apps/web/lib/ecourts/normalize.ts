@@ -1,23 +1,24 @@
 import type { ForumType } from "@/lib/types";
-import type {
-  Enums,
-  EnumOption,
-  NormalizedCase,
-  NormalizedAdvocate,
-  RawCaseData,
-} from "@/lib/ecourts/types";
+import type { Enums, EnumOption, NormalizedCase, RawCaseData } from "@/lib/ecourts/types";
 
-// Resolve an enum code to its human description; fall back to the code itself.
-function describe(list: EnumOption[] | undefined, code: string | undefined): string | null {
+// Resolve an enum code to its human description, using the inline enumLookup
+// the API returns, then falling back to the global enums table.
+function describe(
+  raw: RawCaseData,
+  field: string,
+  code: string | undefined,
+  globalList?: EnumOption[],
+): string | null {
   if (!code) return null;
-  const hit = list?.find((o) => o.code === code);
+  // The API returns per-field inline lookups in descriptions.enumLookup.
+  const inline = raw.descriptions?.enumLookup?.[field]?.[code];
+  if (inline) return inline;
+  const hit = globalList?.find((o) => o.code === code);
   return hit?.description ?? code;
 }
 
-// Map the court to the app's ForumType. `courtType` is often null in real data,
-// so derive from courtName/cnrCourtCode (e.g. "MPHC" → high_court).
-// Forum is only used to prefill a new matter; the sync engine never overwrites
-// the lawyer's chosen forum.
+// Map court name / court code to the app's ForumType.
+// Uses courtName (e.g. "MPHC") or cnrCourtCode (e.g. "MPHC03").
 function toForum(name: string | null): ForumType | null {
   if (!name) return null;
   const s = name.toUpperCase();
@@ -36,21 +37,11 @@ function isDisposed(status: string | null): boolean {
   return s.includes("dispos") || s.includes("decided") || s.includes("closed");
 }
 
-function normalizeSide(side: string | undefined): NormalizedAdvocate["side"] {
-  if (!side) return "other";
-  const s = side.toLowerCase();
-  if (s.includes("petitioner") || s.includes("plaintiff") || s.includes("appellant"))
-    return "petitioner";
-  if (s.includes("respondent") || s.includes("defendant")) return "respondent";
-  return "other";
-}
-
 export function normalizeCase(raw: RawCaseData, enums: Enums | null): NormalizedCase {
-  const status = describe(enums?.caseStatus, raw.caseStatus);
-  const forum = toForum(
-    raw.courtName ?? raw.cnrCourtCode ?? describe(enums?.courtType, raw.courtType),
-  );
-  const disposed = isDisposed(status);
+  const courtDisplay = raw.courtName ?? raw.cnrCourtCode ?? null;
+  const status = describe(raw, "caseStatus", raw.caseStatus, enums?.caseStatus);
+  const forum = toForum(courtDisplay);
+  const disposed = isDisposed(status ?? raw.disposalType ?? null);
 
   const hearings = (raw.historyOfCaseHearings ?? [])
     .map((h) => ({
@@ -58,10 +49,10 @@ export function normalizeCase(raw: RawCaseData, enums: Enums | null): Normalized
       purpose: h.purposeOfListing ?? null,
       outcome: null as string | null,
       business_on_date: h.businessOnDate ? h.businessOnDate.slice(0, 10) : null,
+      judge: h.judge ?? null,
     }))
     .filter((h) => h.hearing_date);
 
-  // Both interim and judgment orders count as "orders" on the timeline.
   const orders = [
     ...(raw.judgmentOrders ?? []).map((o) => ({ ...o, order_type: "judgment" as const })),
     ...(raw.interimOrders ?? []).map((o) => ({ ...o, order_type: "interim" as const })),
@@ -74,32 +65,40 @@ export function normalizeCase(raw: RawCaseData, enums: Enums | null): Normalized
     }))
     .filter((o) => o.order_date);
 
+  const interlocutory_applications = (raw.interlocutoryApplications ?? []).map((ia) => ({
+    ia_number: ia.iaNumber ?? null,
+    status: ia.status ?? null,
+    next_date: ia.nextDate ? ia.nextDate.slice(0, 10) : null,
+  }));
+
+  // Derive case type display: prefer raw display string, fall back to enum lookup.
+  const case_type =
+    raw.caseTypeRaw ??
+    describe(raw, "caseType", raw.caseType, enums?.caseType) ??
+    null as string | null;
+
   return {
     petitioners: raw.petitioners ?? [],
     respondents: raw.respondents ?? [],
+    petitioner_advocates: raw.petitionerAdvocates ?? [],
+    respondent_advocates: raw.respondentAdvocates ?? [],
     judges: raw.judges ?? [],
-    advocates: (raw.advocates ?? []).map((a) => ({
-      name: a.name,
-      side: normalizeSide(a.side),
-    })),
     forum_type: forum,
-    case_type: describe(enums?.caseType, raw.caseType) ?? raw.caseTypeRaw ?? null,
+    court_code: raw.cnrCourtCode ?? null,
+    court_name: courtDisplay,
+    case_type,
+    case_type_raw: raw.caseTypeRaw ?? null,
     court_status: status,
     next_hearing_date: raw.nextHearingDate ? raw.nextHearingDate.slice(0, 10) : null,
+    first_hearing_date: raw.firstHearingDate ? raw.firstHearingDate.slice(0, 10) : null,
     filing_date: raw.filingDate ? raw.filingDate.slice(0, 10) : null,
-    registration_number: raw.registrationNumber ?? null,
+    registration_number: raw.registrationNumber ?? raw.filingNumber ?? null,
+    disposal_type: raw.disposalTypeRaw ?? raw.disposalType ?? null,
     state: raw.state ?? null,
     state_code: raw.stateCode ?? null,
-    acts_sections: (raw.actsAndSections ?? []).map((a) => ({
-      act: a.act,
-      sections: a.sections ?? [],
-    })),
-    interim_applications: (raw.interimApplications ?? []).map((ia) => ({
-      ia_number: ia.iaNumber ?? null,
-      status: ia.status ?? null,
-      next_date: ia.nextDate ? ia.nextDate.slice(0, 10) : null,
-    })),
-    connected_cnrs: raw.connectedCases ?? [],
+    hearing_count: raw.hearingCount ?? 0,
+    interlocutory_applications,
+    tagged_matters: raw.taggedMatters ?? [],
     hearings,
     orders,
     lifecycle_hint: disposed ? "disposed" : "active",
