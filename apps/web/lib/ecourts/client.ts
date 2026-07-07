@@ -1,6 +1,6 @@
 // Server-only: only import this from route handlers, server actions, or cron.
 // It reads ECOURTS_API_KEY (never NEXT_PUBLIC) so it must not reach the client bundle.
-import type { CaseResult, Cnr, Enums, RawCaseData } from "@/lib/ecourts/types";
+import type { CaseResult, Cnr, Enums, RawCaseData, SearchCasesResult, SearchResult, SearchType } from "@/lib/ecourts/types";
 
 // Server-only client for the ecourtsindia.com partner API. Bearer auth + a real
 // User-Agent (Cloudflare 403s bare clients — verified). CNR lookup is a single
@@ -92,6 +92,48 @@ export async function getCauseList(params: {
   if (params.courtCode) q.set("court", params.courtCode);
   const { status, body } = await getJson(`/causelist/search?${q.toString()}`);
   return { ok: status === 200, body };
+}
+
+/** Search cases by party name, FIR number, or filing number.
+ *  Returns a typed result — never throws on rate-limit or error. */
+export async function searchCases(params: {
+  query: string;
+  searchType: SearchType;
+  stateCode?: string;
+}): Promise<SearchCasesResult> {
+  try {
+    if (!process.env.ECOURTS_API_KEY) return { ok: false, reason: "unauthorized" };
+    const q = new URLSearchParams({
+      q: params.query,
+      type: params.searchType,
+    });
+    if (params.stateCode) q.set("state", params.stateCode);
+    const { status, body } = await getJson(`/search?${q.toString()}`);
+    if (status === 401 || status === 403) return { ok: false, reason: "unauthorized", status };
+    if (status === 429) return { ok: false, reason: "rate_limited", status };
+    if (status < 200 || status >= 300) return { ok: false, reason: "error", status };
+    // Defensive parse — field names pending live verification.
+    const items = (body as { data?: { cases?: unknown[] } })?.data?.cases ?? [];
+    const results: SearchResult[] = items.map((raw) => {
+      const r = raw as {
+        cnr?: string;
+        title?: string;
+        court?: string;
+        status?: string;
+        nextHearingDate?: string;
+      };
+      return {
+        cnr: r.cnr ?? "",
+        title: r.title ?? r.cnr ?? "",
+        court: r.court ?? "",
+        status: r.status ?? null,
+        nextHearingDate: r.nextHearingDate ? r.nextHearingDate.slice(0, 10) : null,
+      };
+    }).filter((r) => r.cnr);
+    return { ok: true, results };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
 }
 
 export async function getEnums(): Promise<Enums | null> {

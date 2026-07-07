@@ -6,6 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirect";
 import { nextKey } from "@/lib/db";
 import { syncOneMatter } from "@/lib/ecourts/run";
+import { searchCases } from "@/lib/ecourts/client";
+import type { SearchType, SearchCasesResult } from "@/lib/ecourts/types";
+
+/** Search eCourts for cases matching a query — exposed as a server action for the matter creation form. */
+export async function searchEcourts(
+  query: string,
+  searchType: SearchType,
+  stateCode?: string,
+): Promise<SearchCasesResult> {
+  if (!query.trim()) return { ok: true, results: [] };
+  return searchCases({ query: query.trim(), searchType, stateCode });
+}
 
 export async function createMatter(formData: FormData) {
   const supabase = await createClient();
