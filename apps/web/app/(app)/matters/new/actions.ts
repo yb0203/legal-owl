@@ -30,14 +30,14 @@ export async function addMatterByCnr(cnr: string): Promise<AddMatterResult> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Prevent duplicates.
+  // If the matter already exists, just return it — no error.
   const { data: existing } = await supabase
     .from("matters")
     .select("id")
     .eq("cnr", cnrClean)
     .eq("lawyer_id", user.id)
     .maybeSingle();
-  if (existing?.id) return { ok: false, error: "You already have a matter with this CNR." };
+  if (existing?.id) return { ok: true, matterId: existing.id as string };
 
   // Fetch from eCourts.
   const res = await getCase(cnrClean);
